@@ -6,19 +6,22 @@ namespace GenerationRoguelite.Sample;
 
 public partial class GridSampleManager : Node2D
 {
+    // ──────────── レイアウト定数 ────────────
     private const int Columns = 3;
     private const int Rows = 3;
 
-    private const float CellSize = 280f;
-    private const float CellGap = 20f;
-    private const float GridOriginX = 100f;
-    private const float GridOriginY = 450f;
-    private const float InputMinY = 440f;
+    private const float CellSize = 300f;
+    private const float CellGap = 12f;
+    private const float GridOriginX = 42f;
+    private const float GridOriginY = 380f;
+    private const float InputMinY = 0f; // 画面全域でスワイプ受付
 
-    private const float MoveDuration = 0.15f;
-    private const float GuardHoldThreshold = 0.3f;
-    private const float SwipeThreshold = 50f;
+    // ──────────── 動きの定数（ゆったり化） ────────────
+    private const float MoveDuration = 0.28f;
+    private const float GuardHoldThreshold = 0.25f;
+    private const float SwipeThreshold = 40f;
 
+    // ──────────── バランス定数 ────────────
     private const float BaseLife = 100f;
     private const float HitDamage = 10f;
     private const float GuardDamage = 2f;
@@ -26,13 +29,19 @@ public partial class GridSampleManager : Node2D
     private const int ZoneComboThreshold = 8;
     private const float ZoneDuration = 3f;
 
-    private const float WarningLeadTime = 1.5f;
+    private const float WarningLeadTime = 1.8f;
 
-    private static readonly Color CellBorderDefaultColor = new(0.4f, 0.4f, 0.5f, 0.3f);
+    // ──────────── ガードフレーム制御 ────────────
+    private const int GuardHoldFrame = 5;   // 0-indexed: 長押し中ここで停止
+    private const float GuardReleaseFps = 10f; // 離した後の残りフレーム再生速度
+
+    // ──────────── 色定数 ────────────
+    private static readonly Color CellBorderDefaultColor = new(0.35f, 0.35f, 0.45f, 0.25f);
     private static readonly Color CellBorderZoneColor = new(1f, 0.85f, 0.2f, 0.4f);
-    private static readonly Color CellDefaultColor = new(0.25f, 0.25f, 0.35f, 0.3f);
-    private static readonly Color CellPlayerColor = new(0.27f, 0.53f, 1f, 0.25f);
+    private static readonly Color CellDefaultColor = new(0.2f, 0.2f, 0.3f, 0.18f);
+    private static readonly Color CellPlayerColor = new(0.27f, 0.53f, 1f, 0.2f);
 
+    // ──────────── GameState ────────────
     private enum GameState
     {
         Idle,
@@ -73,7 +82,7 @@ public partial class GridSampleManager : Node2D
 
         public bool WarningShown;
         public ColorRect[]? WarningRects;
-        public TextureRect? WarningArrow;
+        public Sprite2D? WarningArrow;
         public Label? WarningOrder;
     }
 
@@ -95,28 +104,19 @@ public partial class GridSampleManager : Node2D
         public int ComboGainB { get; }
 
         public SimpleEvent(
-            string text,
-            string optionA,
-            string optionB,
-            string responseA,
-            string responseB,
-            int lifeGainA,
-            int lifeGainB,
-            int comboGainA,
-            int comboGainB)
+            string text, string optionA, string optionB,
+            string responseA, string responseB,
+            int lifeGainA, int lifeGainB,
+            int comboGainA, int comboGainB)
         {
-            Text = text;
-            OptionA = optionA;
-            OptionB = optionB;
-            ResponseA = responseA;
-            ResponseB = responseB;
-            LifeGainA = lifeGainA;
-            LifeGainB = lifeGainB;
-            ComboGainA = comboGainA;
-            ComboGainB = comboGainB;
+            Text = text; OptionA = optionA; OptionB = optionB;
+            ResponseA = responseA; ResponseB = responseB;
+            LifeGainA = lifeGainA; LifeGainB = lifeGainB;
+            ComboGainA = comboGainA; ComboGainB = comboGainB;
         }
     }
 
+    // ──────────── フィールド ────────────
     private readonly RandomNumberGenerator _rng = new();
 
     private readonly ColorRect[,] _cellBorders = new ColorRect[Columns, Rows];
@@ -135,6 +135,7 @@ public partial class GridSampleManager : Node2D
 
     private TextureRect _skyBg = null!;
     private TextureRect _midGround = null!;
+    private TextureRect _groundLayer = null!;
 
     private ColorRect _operationArea = null!;
 
@@ -164,8 +165,10 @@ public partial class GridSampleManager : Node2D
     private ColorRect _leftAura = null!;
     private ColorRect _rightAura = null!;
 
+    // テクスチャ
     private Texture2D _texSky = null!;
     private Texture2D _texMidGround = null!;
+    private Texture2D _texGround = null!;
 
     private Texture2D _texObstacleRight = null!;
     private Texture2D _texObstacleTop = null!;
@@ -185,11 +188,13 @@ public partial class GridSampleManager : Node2D
     private Texture2D _texFxZone = null!;
     private Texture2D _texFxCombo = null!;
 
+    // プレイヤー状態
     private int _playerCol = 1;
     private int _playerRow = 1;
 
     private bool _isMoving;
     private bool _isGuarding;
+    private bool _guardReleasing; // ガード解除アニメーション再生中
 
     private bool _spaceHolding;
     private bool _touchHolding;
@@ -197,7 +202,6 @@ public partial class GridSampleManager : Node2D
     private bool _swipeTracking;
 
     private Vector2 _touchStart;
-
     private float _holdElapsed;
 
     private GameState _state = GameState.Idle;
@@ -244,12 +248,16 @@ public partial class GridSampleManager : Node2D
     private StyleBoxFlat _lifeBackgroundStyle = null!;
     private StyleBoxFlat _lifeFillStyle = null!;
 
+    // 背景スクロール用
+    private float _bgScrollOffset;
+
+    // ──────────── ライフサイクル ────────────
     public override void _Ready()
     {
         _rng.Randomize();
 
         CacheNodes();
-        BuildGridCache();
+        BuildGridVisuals();
         BuildPlayerFrames();
 
         LoadTextures();
@@ -267,6 +275,18 @@ public partial class GridSampleManager : Node2D
         float dt = (float)delta;
         _gameTime += dt;
 
+        // 背景微速スクロール（走ってる感）
+        if (_state == GameState.Playing)
+        {
+            _bgScrollOffset += dt * 30f;
+            if (_midGround != null)
+            {
+                // midgroundを左にスクロールさせるシンプル実装
+                float offsetX = -(_bgScrollOffset % 1080f);
+                _midGround.Position = new Vector2(offsetX, _midGround.Position.Y);
+            }
+        }
+
         if (_state == GameState.Playing)
         {
             _waveElapsed += dt;
@@ -276,7 +296,15 @@ public partial class GridSampleManager : Node2D
             TryResolveWaveEnd();
         }
 
+        // イベント中も障害物は動く
+        if (_state == GameState.WaitingChoice)
+        {
+            _waveElapsed += dt;
+            TickObstacles(dt);
+        }
+
         TickGuardHold(dt);
+        TickGuardFrameControl();
         UpdateAttachedEffectsPosition();
         UpdateHud();
     }
@@ -289,7 +317,8 @@ public partial class GridSampleManager : Node2D
             return;
         }
 
-        if (_state != GameState.Playing)
+        // Playing と WaitingChoice 両方で操作を受け付ける
+        if (_state != GameState.Playing && _state != GameState.WaitingChoice)
         {
             return;
         }
@@ -298,6 +327,7 @@ public partial class GridSampleManager : Node2D
         HandleTouchInput(@event);
     }
 
+    // ──────────── ノード取得 ────────────
     private void CacheNodes()
     {
         _player = GetNode<AnimatedSprite2D>("Player");
@@ -310,6 +340,15 @@ public partial class GridSampleManager : Node2D
         Node2D background = GetNode<Node2D>("Background");
         _skyBg = background.GetNode<TextureRect>("SkyBg");
         _midGround = background.GetNode<TextureRect>("MidGround");
+
+        // GroundLayerは動的に作成（tscnに無い場合）
+        _groundLayer = background.GetNodeOrNull<TextureRect>("GroundLayer");
+        if (_groundLayer == null)
+        {
+            _groundLayer = new TextureRect();
+            _groundLayer.Name = "GroundLayer";
+            background.AddChild(_groundLayer);
+        }
 
         _operationArea = GetNode<ColorRect>("OperationArea");
 
@@ -328,9 +367,14 @@ public partial class GridSampleManager : Node2D
         _stateLabel = _ui.GetNode<Label>("StateLabel");
 
         _eventPanel = _ui.GetNode<PanelContainer>("EventPanel");
-        _eventText = _ui.GetNode<Label>("EventPanel/EventVBox/EventText");
-        _choiceA = _ui.GetNode<Button>("EventPanel/EventVBox/ButtonBox/ChoiceA");
-        _choiceB = _ui.GetNode<Button>("EventPanel/EventVBox/ButtonBox/ChoiceB");
+
+        // EventPanelの子ノード: まずVBox構造を試み、なければ直下を探す
+        _eventText = _eventPanel.GetNodeOrNull<Label>("EventVBox/EventText")
+                     ?? _eventPanel.GetNode<Label>("EventText");
+        _choiceA = _eventPanel.GetNodeOrNull<Button>("EventVBox/ButtonBox/ChoiceA")
+                   ?? _eventPanel.GetNode<Button>("ChoiceA");
+        _choiceB = _eventPanel.GetNodeOrNull<Button>("EventVBox/ButtonBox/ChoiceB")
+                   ?? _eventPanel.GetNode<Button>("ChoiceB");
 
         _choiceA.Pressed += () => OnEventOptionSelected(chooseA: true);
         _choiceB.Pressed += () => OnEventOptionSelected(chooseA: false);
@@ -349,7 +393,8 @@ public partial class GridSampleManager : Node2D
         }
     }
 
-    private void BuildGridCache()
+    // ──────────── グリッド構築 ────────────
+    private void BuildGridVisuals()
     {
         for (int row = 0; row < Rows; row++)
         {
@@ -360,6 +405,11 @@ public partial class GridSampleManager : Node2D
                 _cellCenters[col, row] = new Vector2(x, y);
 
                 ColorRect border = _cellBorders[col, row];
+                // tscnの位置を上書き（新しいレイアウト用）
+                border.OffsetLeft = GridOriginX + (col * (CellSize + CellGap));
+                border.OffsetTop = GridOriginY + (row * (CellSize + CellGap));
+                border.OffsetRight = border.OffsetLeft + CellSize;
+                border.OffsetBottom = border.OffsetTop + CellSize;
                 border.Color = CellBorderDefaultColor;
 
                 ColorRect? inner = border.GetNodeOrNull<ColorRect>("Inner");
@@ -385,16 +435,19 @@ public partial class GridSampleManager : Node2D
         CreateScreenAuras();
     }
 
+    // ──────────── アニメーション構築（FPS調整済み） ────────────
     private void BuildPlayerFrames()
     {
         SpriteFrames frames = new();
 
-        RegisterAnimation(frames, "idle", GD.Load<Texture2D>("res://Assets/Sprites/female_idle.png"), 8f, true);
-        RegisterAnimation(frames, "run", GD.Load<Texture2D>("res://Assets/Sprites/female_run.png"), 10f, true);
+        // FPSを全体的に下げてゆったり感を出す
+        RegisterAnimation(frames, "idle", GD.Load<Texture2D>("res://Assets/Sprites/female_idle.png"), 5f, true);
+        RegisterAnimation(frames, "run", GD.Load<Texture2D>("res://Assets/Sprites/female_run.png"), 6f, true);
         RegisterAnimation(frames, "move", GD.Load<Texture2D>("res://Assets/Sprites/female_move.png"), 12f, false);
-        RegisterAnimation(frames, "guard", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), 8f, true);
-        RegisterAnimation(frames, "hurt", GD.Load<Texture2D>("res://Assets/Sprites/female_hurt.png"), 10f, false);
-        RegisterAnimation(frames, "death", GD.Load<Texture2D>("res://Assets/Sprites/female_death.png"), 8f, false);
+        RegisterAnimation(frames, "guard", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), 10f, false); // loop=false!
+        RegisterAnimation(frames, "guard_release", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), GuardReleaseFps, false); // フレーム6-8用
+        RegisterAnimation(frames, "hurt", GD.Load<Texture2D>("res://Assets/Sprites/female_hurt.png"), 6f, false);
+        RegisterAnimation(frames, "death", GD.Load<Texture2D>("res://Assets/Sprites/female_death.png"), 5f, false);
 
         _player.SpriteFrames = frames;
     }
@@ -410,22 +463,43 @@ public partial class GridSampleManager : Node2D
         frames.SetAnimationSpeed(animationName, fps);
         frames.SetAnimationLoop(animationName, loop);
 
-        for (int i = 0; i < 9; i++)
+        if (animationName == "guard_release")
         {
-            int col = i % 3;
-            int row = i / 3;
-
-            AtlasTexture atlas = new();
-            atlas.Atlas = sheet;
-            atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
-            frames.AddFrame(animationName, atlas);
+            // フレーム6,7,8のみ登録
+            for (int i = 6; i < 9; i++)
+            {
+                int col = i % 3;
+                int row = i / 3;
+                AtlasTexture atlas = new();
+                atlas.Atlas = sheet;
+                atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
+                frames.AddFrame(animationName, atlas);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < 9; i++)
+            {
+                int col = i % 3;
+                int row = i / 3;
+                AtlasTexture atlas = new();
+                atlas.Atlas = sheet;
+                atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
+                frames.AddFrame(animationName, atlas);
+            }
         }
     }
 
+    // ──────────── テクスチャ読み込み ────────────
     private void LoadTextures()
     {
         _texSky = LoadRequiredTexture("res://Assets/Backgrounds/sky_bg2.webp");
         _texMidGround = LoadRequiredTexture("res://Assets/Backgrounds/midground_town.webp");
+
+        // 地面テクスチャ: あれば読む、なければmidgroundを流用
+        _texGround = GD.Load<Texture2D>("res://Assets/Backgrounds/ground_near.webp")
+                     ?? GD.Load<Texture2D>("res://Assets/Backgrounds/ground_mid.webp")
+                     ?? _texMidGround;
 
         _texObstacleRight = LoadRequiredTexture("res://Assets/Objects/obstacle_right.webp");
         _texObstacleTop = LoadRequiredTexture("res://Assets/Objects/obstacle_top.webp");
@@ -446,37 +520,52 @@ public partial class GridSampleManager : Node2D
         _texFxCombo = LoadRequiredTexture("res://Assets/UI/fx_combo.webp");
     }
 
+    // ──────────── テクスチャ適用（背景修正+画面拡大） ────────────
     private void ApplyStaticTextures()
     {
+        // 空: 画面上部〜グリッド上端あたりまで
         _skyBg.Texture = _texSky;
         _skyBg.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        _skyBg.StretchMode = TextureRect.StretchModeEnum.Scale;
+        _skyBg.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
         _skyBg.OffsetLeft = 0f;
         _skyBg.OffsetTop = 0f;
         _skyBg.OffsetRight = 1080f;
-        _skyBg.OffsetBottom = 1920f;
+        _skyBg.OffsetBottom = 1000f;
 
+        // 中景: グリッド背後に配置（街並みや森）
         _midGround.Texture = _texMidGround;
         _midGround.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        _midGround.StretchMode = TextureRect.StretchModeEnum.Scale;
+        _midGround.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
         _midGround.OffsetLeft = 0f;
-        _midGround.OffsetTop = 1400f;
-        _midGround.OffsetRight = 1080f;
-        _midGround.OffsetBottom = 1920f;
+        _midGround.OffsetTop = 300f;
+        _midGround.OffsetRight = 2160f; // 2倍幅でスクロール用
+        _midGround.OffsetBottom = 1100f;
 
+        // 地面: グリッド下部〜操作エリア上端
+        _groundLayer.Texture = _texGround;
+        _groundLayer.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+        _groundLayer.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
+        _groundLayer.OffsetLeft = 0f;
+        _groundLayer.OffsetTop = 1000f;
+        _groundLayer.OffsetRight = 1080f;
+        _groundLayer.OffsetBottom = 1420f;
+
+        // ナビアイコン
         ConfigureTextureRectFill(_naviIcon);
         _naviIcon.Texture = _texNaviIcon;
         _naviIcon.CustomMinimumSize = new Vector2(80f, 80f);
 
+        // ナビ吹き出し
         ConfigureTextureRectFill(_naviBubble);
         _naviBubble.Texture = _texNaviBubble;
         _naviBubble.Modulate = new Color(1f, 1f, 1f, 0f);
-
         _navigatorLabel.Modulate = new Color(1f, 1f, 1f, 0f);
 
+        // イベントパネル
         _eventPanel.Visible = false;
         _eventPanel.Modulate = Colors.White;
 
+        // オーバーレイ: mouse_filter=Ignore で入力ブロックを防止
         _flashOverlay.Color = new Color(1f, 1f, 1f, 0f);
         _hitFlashOverlay.Color = new Color(1f, 0f, 0f, 0f);
         _deathOverlay.Color = new Color(0f, 0f, 0f, 0f);
@@ -484,28 +573,33 @@ public partial class GridSampleManager : Node2D
         _hitFlashOverlay.MouseFilter = Control.MouseFilterEnum.Ignore;
         _deathOverlay.MouseFilter = Control.MouseFilterEnum.Ignore;
 
-        _player.Scale = new Vector2(0.59f, 0.59f);
+        // 操作エリアも入力を通す
+        _operationArea.MouseFilter = Control.MouseFilterEnum.Ignore;
+
+        // プレイヤー拡大（画面に対してキャラを大きく）
+        _player.Scale = new Vector2(0.72f, 0.72f);
         _player.Position = _cellCenters[1, 1];
     }
 
+    // ──────────── スタイル適用 ────────────
     private void ApplyStyles()
     {
         _lifeBackgroundStyle = new StyleBoxFlat
         {
             BgColor = new Color(0.15f, 0.15f, 0.2f, 0.8f),
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
+            CornerRadiusTopLeft = 6,
+            CornerRadiusTopRight = 6,
+            CornerRadiusBottomLeft = 6,
+            CornerRadiusBottomRight = 6,
         };
 
         _lifeFillStyle = new StyleBoxFlat
         {
             BgColor = new Color(0.2f, 0.8f, 0.3f, 1f),
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
+            CornerRadiusTopLeft = 6,
+            CornerRadiusTopRight = 6,
+            CornerRadiusBottomLeft = 6,
+            CornerRadiusBottomRight = 6,
         };
 
         _lifeBar.AddThemeStyleboxOverride("background", _lifeBackgroundStyle);
@@ -514,45 +608,40 @@ public partial class GridSampleManager : Node2D
         StyleBoxTexture panelStyle = new()
         {
             Texture = _texEventFrame,
-            TextureMarginLeft = 28,
-            TextureMarginTop = 28,
-            TextureMarginRight = 28,
-            TextureMarginBottom = 28,
+            TextureMarginLeft = 28, TextureMarginTop = 28,
+            TextureMarginRight = 28, TextureMarginBottom = 28,
         };
         _eventPanel.AddThemeStyleboxOverride("panel", panelStyle);
 
         StyleBoxTexture buttonNormal = new()
         {
             Texture = _texEventButton,
-            TextureMarginLeft = 18,
-            TextureMarginTop = 18,
-            TextureMarginRight = 18,
-            TextureMarginBottom = 18,
+            TextureMarginLeft = 18, TextureMarginTop = 18,
+            TextureMarginRight = 18, TextureMarginBottom = 18,
         };
 
         StyleBoxTexture buttonHover = new()
         {
             Texture = _texEventButtonHover,
-            TextureMarginLeft = 18,
-            TextureMarginTop = 18,
-            TextureMarginRight = 18,
-            TextureMarginBottom = 18,
+            TextureMarginLeft = 18, TextureMarginTop = 18,
+            TextureMarginRight = 18, TextureMarginBottom = 18,
         };
 
         SetupButtonStyle(_choiceA, buttonNormal, buttonHover);
         SetupButtonStyle(_choiceB, buttonNormal, buttonHover);
 
-        _phaseLabel.AddThemeFontSizeOverride("font_size", 28);
-        _ageLabel.AddThemeFontSizeOverride("font_size", 28);
-        _waveLabel.AddThemeFontSizeOverride("font_size", 28);
-        _comboLabel.AddThemeFontSizeOverride("font_size", 28);
-        _scoreLabel.AddThemeFontSizeOverride("font_size", 32);
+        // フォントサイズ少し拡大
+        _phaseLabel.AddThemeFontSizeOverride("font_size", 32);
+        _ageLabel.AddThemeFontSizeOverride("font_size", 32);
+        _waveLabel.AddThemeFontSizeOverride("font_size", 30);
+        _comboLabel.AddThemeFontSizeOverride("font_size", 30);
+        _scoreLabel.AddThemeFontSizeOverride("font_size", 36);
 
-        _navigatorLabel.AddThemeFontSizeOverride("font_size", 22);
-        _eventText.AddThemeFontSizeOverride("font_size", 24);
-        _choiceA.AddThemeFontSizeOverride("font_size", 28);
-        _choiceB.AddThemeFontSizeOverride("font_size", 28);
-        _stateLabel.AddThemeFontSizeOverride("font_size", 32);
+        _navigatorLabel.AddThemeFontSizeOverride("font_size", 24);
+        _eventText.AddThemeFontSizeOverride("font_size", 28);
+        _choiceA.AddThemeFontSizeOverride("font_size", 30);
+        _choiceB.AddThemeFontSizeOverride("font_size", 30);
+        _stateLabel.AddThemeFontSizeOverride("font_size", 36);
 
         _phaseLabel.AddThemeColorOverride("font_color", Colors.White);
         _ageLabel.AddThemeColorOverride("font_color", Colors.White);
@@ -573,13 +662,13 @@ public partial class GridSampleManager : Node2D
         button.AddThemeStyleboxOverride("hover", hover);
         button.AddThemeStyleboxOverride("pressed", hover);
         button.AddThemeStyleboxOverride("focus", hover);
-
         button.AddThemeColorOverride("font_color", Colors.White);
         button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_pressed_color", Colors.White);
         button.AddThemeColorOverride("font_focus_color", Colors.White);
     }
 
+    // ──────────── Wave定義（SpeedPerCell拡大=ゆっくり） ────────────
     private void BuildWaveDefs()
     {
         _waves = new[]
@@ -588,34 +677,34 @@ public partial class GridSampleManager : Node2D
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.0f, SpeedPerCell = 0.4f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 4.0f, SpeedPerCell = 0.4f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 6.0f, SpeedPerCell = 0.4f, OrderNumber = 3 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.5f, SpeedPerCell = 0.6f, OrderNumber = 1 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 5.0f, SpeedPerCell = 0.6f, OrderNumber = 2 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 7.5f, SpeedPerCell = 0.6f, OrderNumber = 3 },
                 },
             },
             new WaveDef
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 2.0f, SpeedPerCell = 0.35f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 3.5f, SpeedPerCell = 0.35f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 5.0f, SpeedPerCell = 0.35f, OrderNumber = 3 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 6.5f, SpeedPerCell = 0.35f, OrderNumber = 4 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 7.5f, SpeedPerCell = 0.35f, OrderNumber = 5 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 2.5f, SpeedPerCell = 0.5f, OrderNumber = 1 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 4.5f, SpeedPerCell = 0.5f, OrderNumber = 2 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 6.5f, SpeedPerCell = 0.5f, OrderNumber = 3 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 8.5f, SpeedPerCell = 0.5f, OrderNumber = 4 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 10.0f, SpeedPerCell = 0.5f, OrderNumber = 5 },
                 },
             },
             new WaveDef
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.0f, SpeedPerCell = 0.35f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 2.5f, SpeedPerCell = 0.35f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 1, SpawnTime = 4.0f, SpeedPerCell = 0.25f, OrderNumber = 3 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 5.0f, SpeedPerCell = 0.45f, OrderNumber = 4 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 6.0f, SpeedPerCell = 0.2f, OrderNumber = 5 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 7.0f, SpeedPerCell = 0.3f, OrderNumber = 6 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 7.5f, SpeedPerCell = 0.3f, OrderNumber = 7 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 9.0f, SpeedPerCell = 0.2f, OrderNumber = 8 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.5f, SpeedPerCell = 0.5f, OrderNumber = 1 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 3.5f, SpeedPerCell = 0.5f, OrderNumber = 2 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 1, SpawnTime = 5.5f, SpeedPerCell = 0.4f, OrderNumber = 3 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 7.0f, SpeedPerCell = 0.55f, OrderNumber = 4 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 8.5f, SpeedPerCell = 0.35f, OrderNumber = 5 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 10.0f, SpeedPerCell = 0.45f, OrderNumber = 6 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 11.0f, SpeedPerCell = 0.45f, OrderNumber = 7 },
+                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 12.5f, SpeedPerCell = 0.35f, OrderNumber = 8 },
                 },
             },
         };
@@ -626,32 +715,27 @@ public partial class GridSampleManager : Node2D
         _events = new[]
         {
             new SimpleEvent(
-                text: "\u9053\u7aef\u3067\u56f0\u3063\u3066\u3044\u308b\u4eba\u3092\u898b\u304b\u3051\u305f",
-                optionA: "\u52a9\u3051\u308b",
-                optionB: "\u901a\u308a\u904e\u304e\u308b",
-                responseA: "\u512a\u3057\u3044\u306d\uff01",
-                responseB: "\u307e\u3041\u4ed5\u65b9\u306a\u3044\u304b",
+                "道端で困っている人を見かけた",
+                "助ける", "通り過ぎる",
+                "優しいね！", "まぁ仕方ないか",
                 lifeGainA: 5, lifeGainB: 0,
                 comboGainA: 0, comboGainB: 0),
             new SimpleEvent(
-                text: "\u843d\u3068\u3057\u7269\u3092\u62fe\u3063\u305f",
-                optionA: "\u5c4a\u3051\u308b",
-                optionB: "\u81ea\u5206\u306e\u3082\u306e\u306b\u3059\u308b",
-                responseA: "\u3044\u3044\u3053\u3068\u3057\u305f\uff01",
-                responseB: "\u3046\u30fc\u3093...",
+                "落とし物を拾った",
+                "届ける", "自分のものにする",
+                "いいことした！", "うーん...",
                 lifeGainA: 0, lifeGainB: 10,
                 comboGainA: 2, comboGainB: 0),
             new SimpleEvent(
-                text: "\u53cb\u4eba\u304b\u3089\u8a98\u3044\u306e\u9023\u7d61\u304c\u6765\u305f",
-                optionA: "\u904a\u3073\u306b\u884c\u304f",
-                optionB: "\u65ad\u3063\u3066\u4f11\u3080",
-                responseA: "\u30ea\u30d5\u30ec\u30c3\u30b7\u30e5\uff01",
-                responseB: "\u4f11\u606f\u3082\u5927\u4e8b",
+                "友人から誘いの連絡が来た",
+                "遊びに行く", "断って休む",
+                "リフレッシュ！", "休息も大事",
                 lifeGainA: 3, lifeGainB: 5,
                 comboGainA: 0, comboGainB: 0),
         };
     }
 
+    // ──────────── 状態リセット ────────────
     private void ResetToIdleState(bool showIntroMessage)
     {
         _state = GameState.Idle;
@@ -668,6 +752,7 @@ public partial class GridSampleManager : Node2D
 
         _isMoving = false;
         _isGuarding = false;
+        _guardReleasing = false;
         _spaceHolding = false;
         _touchHolding = false;
         _touchEligible = false;
@@ -682,11 +767,11 @@ public partial class GridSampleManager : Node2D
         _lastMoveHadThreatAtDestination = false;
 
         _directionCalloutDone = new bool[4];
+        _bgScrollOffset = 0f;
 
         _playerCol = 1;
         _playerRow = 1;
         _player.Position = _cellCenters[_playerCol, _playerRow];
-
         _player.Modulate = Colors.White;
         _player.Play("idle");
 
@@ -725,7 +810,7 @@ public partial class GridSampleManager : Node2D
 
         if (showIntroMessage)
         {
-            Speak("\u753b\u9762\u306e\u4e0b\u3092\u30b9\u30ef\u30a4\u30d7\u3057\u3066\u52d5\u3053\u3046\uff01", 4f);
+            Speak("画面をスワイプして動こう！", 4f);
         }
 
         UpdateHud();
@@ -768,24 +853,19 @@ public partial class GridSampleManager : Node2D
             _obstacleStates.Add(state);
         }
 
-        _stateLabel.Text = "Playing";
+        _stateLabel.Text = "";
         _player.Play(_isGuarding ? "guard" : "run");
 
-        Speak($"Wave {waveIndex + 1} \u30b9\u30bf\u30fc\u30c8\uff01", 2f);
+        Speak($"Wave {waveIndex + 1} スタート！", 2f);
     }
 
+    // ──────────── 入力判定 ────────────
     private bool IsStartInput(InputEvent @event)
     {
         if (@event is InputEventKey key)
-        {
             return key.Pressed && !key.Echo;
-        }
-
         if (@event is InputEventScreenTouch touch)
-        {
-            return touch.Pressed && touch.Position.Y >= InputMinY;
-        }
-
+            return touch.Pressed;
         return false;
     }
 
@@ -801,19 +881,13 @@ public partial class GridSampleManager : Node2D
             else if (!guardKey.Pressed)
             {
                 _spaceHolding = false;
-                if (!_touchHolding)
-                {
-                    EndGuard();
-                }
+                if (!_touchHolding) EndGuard();
             }
-
             return;
         }
 
         if (@event is not InputEventKey moveKey || !moveKey.Pressed || moveKey.Echo)
-        {
             return;
-        }
 
         bool moved = moveKey.Keycode switch
         {
@@ -824,10 +898,7 @@ public partial class GridSampleManager : Node2D
             _ => false,
         };
 
-        if (moved)
-        {
-            OnFirstSuccessfulMove();
-        }
+        if (moved) OnFirstSuccessfulMove();
     }
 
     private void HandleTouchInput(InputEvent @event)
@@ -836,14 +907,7 @@ public partial class GridSampleManager : Node2D
         {
             if (touch.Pressed)
             {
-                _touchEligible = touch.Position.Y >= InputMinY;
-                if (!_touchEligible)
-                {
-                    _touchHolding = false;
-                    _swipeTracking = false;
-                    return;
-                }
-
+                _touchEligible = true;
                 _touchHolding = true;
                 _swipeTracking = true;
                 _touchStart = touch.Position;
@@ -854,60 +918,43 @@ public partial class GridSampleManager : Node2D
                 _touchHolding = false;
                 _touchEligible = false;
                 _swipeTracking = false;
-                if (!_spaceHolding)
-                {
-                    EndGuard();
-                }
+                if (!_spaceHolding) EndGuard();
             }
-
             return;
         }
 
         if (@event is not InputEventScreenDrag drag || !_swipeTracking || !_touchEligible)
-        {
             return;
-        }
 
         Vector2 delta = drag.Position - _touchStart;
         if (delta.Length() < SwipeThreshold)
-        {
             return;
-        }
 
         bool moved;
         if (Mathf.Abs(delta.X) > Mathf.Abs(delta.Y))
-        {
             moved = TryMove(delta.X > 0f ? 1 : -1, 0);
-        }
         else
-        {
             moved = TryMove(0, delta.Y > 0f ? 1 : -1);
-        }
 
         _swipeTracking = false;
         _touchHolding = false;
         _holdElapsed = 0f;
 
-        if (moved)
-        {
-            OnFirstSuccessfulMove();
-        }
+        if (moved) OnFirstSuccessfulMove();
     }
 
+    // ──────────── 移動（ヌルっと感の改善） ────────────
     private bool TryMove(int dx, int dy)
     {
-        if (_state != GameState.Playing || _isMoving || _isGuarding)
-        {
+        // Playing と WaitingChoice 両方で移動可能
+        if ((_state != GameState.Playing && _state != GameState.WaitingChoice) || _isMoving || _isGuarding || _guardReleasing)
             return false;
-        }
 
         int targetCol = _playerCol + dx;
         int targetRow = _playerRow + dy;
 
         if (targetCol < 0 || targetCol >= Columns || targetRow < 0 || targetRow >= Rows)
-        {
             return false;
-        }
 
         int fromCol = _playerCol;
         int fromRow = _playerRow;
@@ -917,20 +964,20 @@ public partial class GridSampleManager : Node2D
 
         _playerCol = targetCol;
         _playerRow = targetRow;
-
         _stayTimer = 0f;
-
         _isMoving = true;
+
+        // moveアニメーション開始
         _player.Play("move");
 
+        // ヌルっとした移動: Cubic.InOut で加速→減速
         Tween tween = CreateTween();
         tween.TweenProperty(_player, "position", _cellCenters[_playerCol, _playerRow], MoveDuration)
-            .SetEase(Tween.EaseType.Out)
-            .SetTrans(Tween.TransitionType.Quad);
+            .SetEase(Tween.EaseType.InOut)
+            .SetTrans(Tween.TransitionType.Cubic);
         tween.TweenCallback(Callable.From(() => OnMoveFinished(fromCol, fromRow, stayBeforeMove)));
 
         UpdateCellColors();
-
         return true;
     }
 
@@ -942,45 +989,38 @@ public partial class GridSampleManager : Node2D
         _lastLeftRow = fromRow;
         _lastMoveTime = _gameTime;
         _stayTimeAtLastMove = stayBeforeMove;
-
         _stayTimer = 0f;
 
-        if (_state == GameState.Playing)
+        // moveアニメーションが終わるまで待つ（AnimationFinishedで復帰）
+        // ただしmoveが既に終わっていればrunに戻す
+        if (_player.Animation != "move")
         {
-            _player.Play(_isGuarding ? "guard" : "run");
+            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+                _player.Play(_isGuarding ? "guard" : "run");
         }
+        // else: OnPlayerAnimationFinished で "run" に戻る
     }
 
     private void OnFirstSuccessfulMove()
     {
-        if (_hintShown)
-        {
-            return;
-        }
-
+        if (_hintShown) return;
         DismissSwipeHint(immediate: false);
-        Speak("\u3044\u3044\u611f\u3058\uff01\u969c\u5bb3\u7269\u3092\u907f\u3051\u3066\u9032\u3082\u3046\uff01", 2.2f);
+        Speak("いい感じ！障害物を避けて進もう！", 2.2f);
     }
 
     private void TickStayTimer(float dt)
     {
-        if (!_isMoving)
-        {
-            _stayTimer += dt;
-        }
+        if (!_isMoving) _stayTimer += dt;
     }
 
+    // ──────────── ガード（フレーム制御付き） ────────────
     private void TickGuardHold(float dt)
     {
         bool holding = _spaceHolding || _touchHolding;
 
-        if (_state != GameState.Playing || _isMoving)
+        if ((_state != GameState.Playing && _state != GameState.WaitingChoice) || _isMoving)
         {
-            if (!holding)
-            {
-                _holdElapsed = 0f;
-            }
-
+            if (!holding) _holdElapsed = 0f;
             return;
         }
 
@@ -988,9 +1028,7 @@ public partial class GridSampleManager : Node2D
         {
             _holdElapsed += dt;
             if (_holdElapsed >= GuardHoldThreshold)
-            {
                 StartGuard();
-            }
         }
         else
         {
@@ -999,71 +1037,66 @@ public partial class GridSampleManager : Node2D
         }
     }
 
+    private void TickGuardFrameControl()
+    {
+        // ガード中: フレーム GuardHoldFrame で停止
+        if (_isGuarding && _player.Animation == "guard" && _player.Frame >= GuardHoldFrame)
+        {
+            _player.Frame = GuardHoldFrame;
+            _player.Pause();
+        }
+    }
+
     private void StartGuard()
     {
-        if (_isGuarding || _state != GameState.Playing)
-        {
+        if (_isGuarding || (_state != GameState.Playing && _state != GameState.WaitingChoice))
             return;
-        }
 
         _isGuarding = true;
+        _guardReleasing = false;
         _player.Play("guard");
         ShowGuardEffect();
     }
 
     private void EndGuard()
     {
-        if (!_isGuarding)
-        {
-            return;
-        }
+        if (!_isGuarding) return;
 
         _isGuarding = false;
         HideGuardEffect();
 
-        if (_state == GameState.Playing && !_isMoving)
-        {
-            _player.Play("run");
-        }
+        // ガード解除: フレーム6-8を再生
+        _guardReleasing = true;
+        _player.Play("guard_release");
+        // guard_release の AnimationFinished で _guardReleasing = false & run に戻る
     }
 
+    // ──────────── 障害物Tick ────────────
     private void TickObstacles(float dt)
     {
         for (int i = 0; i < _obstacleStates.Count; i++)
         {
             ObstacleState state = _obstacleStates[i];
-
-            if (state.IsFinished)
-            {
-                _obstacleStates[i] = state;
-                continue;
-            }
+            if (state.IsFinished) { _obstacleStates[i] = state; continue; }
 
             float warnStart = state.Entry.SpawnTime - WarningLeadTime;
             if (!state.WarningShown && _waveElapsed >= warnStart)
-            {
                 ShowWarning(ref state);
-            }
 
             if (state.WarningShown && !state.IsSpawned)
-            {
                 UpdateWarningVisual(ref state);
-            }
 
             if (!state.IsSpawned && _waveElapsed >= state.Entry.SpawnTime)
-            {
                 SpawnObstacle(ref state);
-            }
 
             if (state.IsActive)
-            {
                 UpdateObstacleMotion(ref state, dt);
-            }
 
             _obstacleStates[i] = state;
         }
     }
 
+    // ──────────── 警告表示（視認性改善） ────────────
     private void ShowWarning(ref ObstacleState state)
     {
         state.WarningShown = true;
@@ -1079,27 +1112,32 @@ public partial class GridSampleManager : Node2D
             rect.OffsetTop = center.Y - (CellSize * 0.5f);
             rect.OffsetRight = center.X + (CellSize * 0.5f);
             rect.OffsetBottom = center.Y + (CellSize * 0.5f);
-            rect.Color = new Color(1f, 0.2f, 0.2f, 0.1f);
-
+            rect.Color = new Color(1f, 0.15f, 0.15f, 0.08f);
             _warningRoot.AddChild(rect);
             warningRects[i] = rect;
         }
 
+        // 方向を示す矢印アイコン（大きめ）
         Vector2I entryCell = GetPathCell(state.Entry.Direction, state.Entry.Lane, 0);
         Vector2 entryCenter = _cellCenters[entryCell.X, entryCell.Y];
 
-        TextureRect arrow = new();
+        // 警告矢印をSprite2Dに変更して回転基準を中心にする
+        Sprite2D arrow = new();
         arrow.Texture = _texWarningIcon;
-        arrow.Size = new Vector2(32f, 32f);
-        arrow.Position = entryCenter + new Vector2(38f, -42f);
+        arrow.Scale = new Vector2(0.6f, 0.6f);
+        arrow.Position = GetWarningArrowPosition(state.Entry.Direction, entryCenter);
         arrow.RotationDegrees = GetWarningArrowRotation(state.Entry.Direction);
-        ConfigureTextureRectFill(arrow);
 
+        // 番号: 大きくして背景付き
         Label order = new();
         order.Text = state.Entry.OrderNumber.ToString();
-        order.Position = entryCenter - new Vector2(14f, 26f);
-        order.AddThemeFontSizeOverride("font_size", 36);
-        order.AddThemeColorOverride("font_color", new Color(1f, 0.45f, 0.45f, 1f));
+        order.HorizontalAlignment = HorizontalAlignment.Center;
+        order.VerticalAlignment = VerticalAlignment.Center;
+        order.Position = GetWarningNumberPosition(state.Entry.Direction, entryCenter);
+        order.AddThemeFontSizeOverride("font_size", 52);
+        order.AddThemeColorOverride("font_color", Colors.White);
+        order.AddThemeColorOverride("font_outline_color", new Color(0.8f, 0.1f, 0.1f, 1f));
+        order.AddThemeConstantOverride("outline_size", 6);
 
         _warningRoot.AddChild(arrow);
         _warningRoot.AddChild(order);
@@ -1112,27 +1150,56 @@ public partial class GridSampleManager : Node2D
         if (!_directionCalloutDone[dirIndex])
         {
             _directionCalloutDone[dirIndex] = true;
-            Speak(GetDirectionCallout(state.Entry.Direction), 1.2f);
+            Speak(GetDirectionCallout(state.Entry.Direction), 1.5f);
         }
+    }
+
+    private Vector2 GetWarningArrowPosition(ObstacleDirection dir, Vector2 cellCenter)
+    {
+        float offset = CellSize * 0.5f + 30f;
+        return dir switch
+        {
+            ObstacleDirection.Right => cellCenter + new Vector2(offset, 0f),
+            ObstacleDirection.Left => cellCenter + new Vector2(-offset, 0f),
+            ObstacleDirection.Top => cellCenter + new Vector2(0f, -offset),
+            ObstacleDirection.Down => cellCenter + new Vector2(0f, offset),
+            _ => cellCenter,
+        };
+    }
+
+    private Vector2 GetWarningNumberPosition(ObstacleDirection dir, Vector2 cellCenter)
+    {
+        float offset = CellSize * 0.5f + 50f;
+        return dir switch
+        {
+            ObstacleDirection.Right => cellCenter + new Vector2(offset, -30f),
+            ObstacleDirection.Left => cellCenter + new Vector2(-offset - 20f, -30f),
+            ObstacleDirection.Top => cellCenter + new Vector2(-14f, -offset - 20f),
+            ObstacleDirection.Down => cellCenter + new Vector2(-14f, offset),
+            _ => cellCenter,
+        };
     }
 
     private void UpdateWarningVisual(ref ObstacleState state)
     {
-        if (state.WarningRects == null)
-        {
-            return;
-        }
+        if (state.WarningRects == null) return;
 
         float warnStart = state.Entry.SpawnTime - WarningLeadTime;
         float ratio = Mathf.Clamp((_waveElapsed - warnStart) / WarningLeadTime, 0f, 1f);
-        float alpha = 0.1f + (0.3f * ratio);
+        float alpha = 0.08f + (0.35f * ratio);
 
         for (int i = 0; i < state.WarningRects.Length; i++)
+            state.WarningRects[i].Color = new Color(1f, 0.15f, 0.15f, alpha);
+
+        // 矢印を点滅
+        if (state.WarningArrow != null)
         {
-            state.WarningRects[i].Color = new Color(1f, 0.2f, 0.2f, alpha);
+            float blink = (Mathf.Sin(_gameTime * 8f) + 1f) * 0.5f;
+            state.WarningArrow.Modulate = new Color(1f, 1f, 1f, 0.5f + blink * 0.5f);
         }
     }
 
+    // ──────────── 障害物スポーン ────────────
     private void SpawnObstacle(ref ObstacleState state)
     {
         state.IsSpawned = true;
@@ -1145,21 +1212,20 @@ public partial class GridSampleManager : Node2D
 
         TextureRect obstacleVisual = new();
         obstacleVisual.Texture = ResolveObstacleTexture(state.Entry.Direction);
-        obstacleVisual.Size = new Vector2(96f, 96f);
+        obstacleVisual.Size = new Vector2(110f, 110f); // 少し大きく
         ConfigureTextureRectFill(obstacleVisual);
 
         if (state.Entry.Direction == ObstacleDirection.Left)
-        {
             obstacleVisual.FlipH = true;
-        }
 
         Vector2 start = GetOutsidePoint(state.Entry.Direction, state.Entry.Lane, entering: true);
-        obstacleVisual.Position = start - new Vector2(48f, 48f);
+        obstacleVisual.Position = start - new Vector2(55f, 55f);
 
         _obstaclesRoot.AddChild(obstacleVisual);
         state.Visual = obstacleVisual;
     }
 
+    // ──────────── 障害物の動き（反射バグ修正） ────────────
     private void UpdateObstacleMotion(ref ObstacleState state, float dt)
     {
         state.ElapsedSinceSpawn += dt;
@@ -1171,36 +1237,25 @@ public partial class GridSampleManager : Node2D
         if (maxCellToResolve > state.CurrentCellIndex)
         {
             for (int cellIndex = state.CurrentCellIndex + 1; cellIndex <= maxCellToResolve; cellIndex++)
-            {
                 ResolveCellPass(ref state, cellIndex);
-            }
-
             state.CurrentCellIndex = maxCellToResolve;
         }
 
         if (state.Visual != null)
         {
             Vector2 position = ComputeObstaclePosition(state.Entry, t);
-            state.Visual.Position = position - new Vector2(48f, 48f);
+            state.Visual.Position = position - new Vector2(55f, 55f);
         }
 
+        // 3セル通過+退出 → t>=4 で消滅
         if (t >= 4f)
-        {
             FinishObstacle(ref state);
-        }
     }
 
     private void ResolveCellPass(ref ObstacleState state, int cellIndex)
     {
-        if (cellIndex < 0 || cellIndex >= 3)
-        {
-            return;
-        }
-
-        if (state.HitApplied[cellIndex])
-        {
-            return;
-        }
+        if (cellIndex < 0 || cellIndex >= 3) return;
+        if (state.HitApplied[cellIndex]) return;
 
         Vector2I cell = GetPathCell(state.Entry.Direction, state.Entry.Lane, cellIndex);
         int col = cell.X;
@@ -1217,15 +1272,12 @@ public partial class GridSampleManager : Node2D
                 AddSafeScore(col, row, isJust: false, lucky: false, comboGain: 1, baseScore: 100);
                 return;
             }
-
             state.HitApplied[cellIndex] = true;
             ApplyHit();
             return;
         }
 
-        bool lucky;
-        bool justAvoid = IsJustAvoid(col, row, out lucky);
-
+        bool justAvoid = IsJustAvoid(col, row, out bool lucky);
         state.HitApplied[cellIndex] = true;
 
         if (justAvoid)
@@ -1240,20 +1292,13 @@ public partial class GridSampleManager : Node2D
     private bool IsJustAvoid(int col, int row, out bool lucky)
     {
         lucky = false;
-
         bool sameCell = _lastLeftCol == col && _lastLeftRow == row;
-        if (!sameCell)
-        {
-            return false;
-        }
+        if (!sameCell) return false;
 
-        bool movedRecently = (_gameTime - _lastMoveTime) <= 0.4f;
-        bool stayedEnough = _stayTimeAtLastMove >= 0.3f;
+        bool movedRecently = (_gameTime - _lastMoveTime) <= 0.5f;
+        bool stayedEnough = _stayTimeAtLastMove >= 0.25f;
 
-        if (!movedRecently || !stayedEnough)
-        {
-            return false;
-        }
+        if (!movedRecently || !stayedEnough) return false;
 
         lucky = !_lastMoveHadThreatAtDestination;
         return true;
@@ -1266,7 +1311,6 @@ public partial class GridSampleManager : Node2D
         int comboMultiplier = Mathf.Max(1, _combo);
         int zoneMultiplier = _zoneActive ? 5 : 1;
         int earned = baseScore * comboMultiplier * zoneMultiplier;
-
         _totalScore += earned;
 
         Vector2 popupPos = _cellCenters[col, row] + new Vector2(0f, -64f);
@@ -1275,14 +1319,7 @@ public partial class GridSampleManager : Node2D
         if (isJust)
         {
             PlayJustAvoidEffects(col, row, lucky);
-            if (lucky)
-            {
-                Speak("\u30e9\u30c3\u30ad\u30fc\uff01", 1f);
-            }
-            else
-            {
-                Speak(PickRandom(new[] { "\u30ca\u30a4\u30b9\uff01", "\u304b\u3063\u3053\u3044\u3044\uff01", "\u898b\u4e8b\uff01" }), 1.2f);
-            }
+            Speak(lucky ? "ラッキー！" : PickRandom(new[] { "ナイス！", "かっこいい！", "見事！" }), 1.2f);
         }
         else
         {
@@ -1294,20 +1331,11 @@ public partial class GridSampleManager : Node2D
 
     private void ApplyComboGain(int gain, int col, int row, bool isJust)
     {
-        if (gain <= 0)
-        {
-            return;
-        }
-
+        if (gain <= 0) return;
         _combo += gain;
-
         PlayComboTierEffects(col, row);
-
         if (_combo >= ZoneComboThreshold && !_zoneActive)
-        {
             ActivateZone();
-        }
-
     }
 
     private void ApplyHit()
@@ -1316,23 +1344,15 @@ public partial class GridSampleManager : Node2D
         _life = Mathf.Max(0f, _life - damage);
 
         _combo = 0;
-        if (_zoneActive)
-        {
-            DeactivateZone();
-        }
-
+        if (_zoneActive) DeactivateZone();
         SetAuraAlpha(0f);
 
         PlayHitEffects();
         _player.Play("hurt");
 
-        Speak(PickRandom(new[] { "\u75db\u3044\uff01", "\u6c17\u3092\u3064\u3051\u3066\uff01", "\u307e\u3060\u3044\u3051\u308b\uff01" }), 1.2f);
+        Speak(PickRandom(new[] { "痛い！", "気をつけて！", "まだいける！" }), 1.2f);
 
-        if (_life <= 0f)
-        {
-            Die();
-        }
-
+        if (_life <= 0f) Die();
         UpdateHud();
     }
 
@@ -1342,44 +1362,38 @@ public partial class GridSampleManager : Node2D
 
         if (_combo <= 3)
         {
-            FlashCell(center, new Color(1f, 1f, 1f, 0.25f), 0.2f, 0f);
-            ShowFloatingText("Nice!", center + new Vector2(0f, -88f), Colors.White, 36, 0.7f);
+            FlashCell(center, new Color(1f, 1f, 1f, 0.2f), 0.3f, 0f);
+            ShowFloatingText("Nice!", center + new Vector2(0f, -88f), Colors.White, 38, 0.9f);
             return;
         }
 
         if (_combo <= 5)
         {
-            FlashCell(center, new Color(0.7f, 0.9f, 1f, 0.28f), 0.25f, 14f);
-            ShowFloatingText("Great!", center + new Vector2(0f, -92f), new Color(0.3f, 0.8f, 1f, 1f), 42, 0.75f);
+            FlashCell(center, new Color(0.7f, 0.9f, 1f, 0.25f), 0.35f, 14f);
+            ShowFloatingText("Great!", center + new Vector2(0f, -92f), new Color(0.3f, 0.8f, 1f, 1f), 46, 0.9f);
             SetAuraAlpha(0.15f);
             return;
         }
 
         if (_combo <= 7)
         {
-            FlashCell(center, new Color(1f, 0.95f, 0.4f, 0.32f), 0.28f, 18f);
-            ShowFloatingText("Amazing!!", center + new Vector2(0f, -96f), new Color(1f, 0.9f, 0.2f, 1f), 48, 0.8f);
+            FlashCell(center, new Color(1f, 0.95f, 0.4f, 0.3f), 0.4f, 18f);
+            ShowFloatingText("Amazing!!", center + new Vector2(0f, -96f), new Color(1f, 0.9f, 0.2f, 1f), 52, 1f);
             SetAuraAlpha(0.25f);
-            ShakeScreen(3f, 4, 0.05f);
+            ShakeScreen(3f, 4, 0.06f);
 
-            if (_combo == 6)
-            {
-                Speak("\u3059\u3054\u3044\uff01\u3053\u306e\u8abf\u5b50\uff01", 1.2f);
-            }
-            else if (_combo == 7)
-            {
-                Speak("\u3042\u30681\u56de...\uff01", 1.2f);
-            }
+            if (_combo == 6) Speak("すごい！この調子！", 1.2f);
+            else if (_combo == 7) Speak("あと1回...！", 1.2f);
         }
     }
 
+    // ──────────── ゾーン ────────────
     private void ActivateZone()
     {
         _zoneActive = true;
         _zoneRemaining = ZoneDuration;
 
-        Speak("\u30be\u30fc\u30f3\u7a81\u5165\uff01\u7121\u6575\u3060\uff01", 1.8f);
-
+        Speak("ゾーン突入！無敵だ！", 1.8f);
         TriggerTimeStop(0.3f, 0.2f);
         PlayWhiteFlash(0.6f, 0.2f);
         ShowZoneBanner();
@@ -1388,7 +1402,6 @@ public partial class GridSampleManager : Node2D
         SetCellBorderZoneColor(enabled: true);
         ShowZoneEffect();
         SetAuraAlpha(0.25f);
-
         UpdateHud();
     }
 
@@ -1397,47 +1410,29 @@ public partial class GridSampleManager : Node2D
         _zoneActive = false;
         _zoneRemaining = 0f;
         _combo = 0;
-
         _player.Modulate = Colors.White;
         SetCellBorderZoneColor(enabled: false);
         HideZoneEffect();
         SetAuraAlpha(0f);
-
         UpdateHud();
     }
 
     private void TickZone(float dt)
     {
-        if (!_zoneActive)
-        {
-            return;
-        }
-
+        if (!_zoneActive) return;
         _zoneRemaining -= dt;
-        if (_zoneRemaining <= 0f)
-        {
-            DeactivateZone();
-        }
+        if (_zoneRemaining <= 0f) DeactivateZone();
     }
 
+    // ──────────── Wave遷移（イベント中も操作可能に修正） ────────────
     private void TryResolveWaveEnd()
     {
-        if (_state != GameState.Playing || _waveResolved)
-        {
-            return;
-        }
-
-        if (_obstacleStates.Count == 0)
-        {
-            return;
-        }
+        if (_state != GameState.Playing || _waveResolved) return;
+        if (_obstacleStates.Count == 0) return;
 
         for (int i = 0; i < _obstacleStates.Count; i++)
         {
-            if (!_obstacleStates[i].IsFinished)
-            {
-                return;
-            }
+            if (!_obstacleStates[i].IsFinished) return;
         }
 
         _waveResolved = true;
@@ -1453,24 +1448,24 @@ public partial class GridSampleManager : Node2D
 
     private void ShowInterWaveEvent(int nextWaveIndex)
     {
+        // WaitingChoice でも入力は引き続き受け付ける
         _state = GameState.WaitingChoice;
         _pendingWaveIndex = nextWaveIndex;
         _eventLocked = false;
 
         _activeEvent = _events[_rng.RandiRange(0, _events.Length - 1)];
-
         _eventText.Text = _activeEvent.Text;
         _choiceA.Text = _activeEvent.OptionA;
         _choiceB.Text = _activeEvent.OptionB;
-
         _choiceA.Disabled = false;
         _choiceB.Disabled = false;
 
         _eventPanel.Visible = true;
         _eventPanel.Modulate = new Color(1f, 1f, 1f, 0f);
+        _eventPanel.MouseFilter = Control.MouseFilterEnum.Stop; // パネル自体は入力を受ける
 
         Tween fadeIn = CreateTween();
-        fadeIn.TweenProperty(_eventPanel, "modulate:a", 1f, 0.2f);
+        fadeIn.TweenProperty(_eventPanel, "modulate:a", 1f, 0.3f);
 
         _stateLabel.Text = "イベントを選択して次へ";
     }
@@ -1478,24 +1473,18 @@ public partial class GridSampleManager : Node2D
     private void OnEventOptionSelected(bool chooseA)
     {
         if (_state != GameState.WaitingChoice || _eventLocked || _activeEvent == null)
-        {
             return;
-        }
 
         _eventLocked = true;
         _choiceA.Disabled = true;
         _choiceB.Disabled = true;
 
         if (chooseA)
-        {
             ApplyEventOutcome(_activeEvent.LifeGainA, _activeEvent.ComboGainA, _activeEvent.ResponseA);
-        }
         else
-        {
             ApplyEventOutcome(_activeEvent.LifeGainB, _activeEvent.ComboGainB, _activeEvent.ResponseB);
-        }
 
-        SceneTreeTimer timer = GetTree().CreateTimer(1f);
+        SceneTreeTimer timer = GetTree().CreateTimer(1.2f);
         timer.Timeout += () =>
         {
             _eventPanel.Visible = false;
@@ -1503,11 +1492,7 @@ public partial class GridSampleManager : Node2D
             _eventLocked = false;
             _activeEvent = null;
 
-            if (_state == GameState.Dead)
-            {
-                _pendingWaveIndex = -1;
-                return;
-            }
+            if (_state == GameState.Dead) { _pendingWaveIndex = -1; return; }
 
             int nextWaveIndex = _pendingWaveIndex;
             _pendingWaveIndex = -1;
@@ -1518,23 +1503,15 @@ public partial class GridSampleManager : Node2D
     private void ApplyEventOutcome(int lifeGain, int comboGain, string response)
     {
         _life = Mathf.Clamp(_life + lifeGain, 0f, BaseLife);
-
         if (comboGain > 0)
-        {
             AddSafeScore(_playerCol, _playerRow, isJust: false, lucky: false, comboGain: comboGain, baseScore: 100);
-        }
-
         Speak(response, 2f);
         UpdateHud();
     }
 
     private void HideEventPanel()
     {
-        if (!_eventPanel.Visible)
-        {
-            return;
-        }
-
+        if (!_eventPanel.Visible) return;
         Tween fadeOut = CreateTween();
         fadeOut.TweenProperty(_eventPanel, "modulate:a", 0f, 0.2f);
         fadeOut.TweenCallback(Callable.From(() =>
@@ -1545,95 +1522,93 @@ public partial class GridSampleManager : Node2D
         }));
     }
 
+    // ──────────── クリア / 死亡 ────────────
     private void SetClearedState()
     {
         _state = GameState.Cleared;
         _allWavesCleared = true;
-
         _player.Play("idle");
         _player.Modulate = Colors.White;
-
         HideEventPanel();
         HideGuardEffect();
-        if (_zoneActive)
-        {
-            DeactivateZone();
-        }
-
+        if (_zoneActive) DeactivateZone();
         _stateLabel.Text = "ALL WAVES CLEAR!";
         _stateLabel.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f, 1f));
-
-        Speak("\u3084\u3063\u305f\uff01\u5168Wave\u7a81\u7834\uff01", 3f);
+        Speak("やった！全Wave突破！", 3f);
     }
 
     private void Die()
     {
         _state = GameState.Dead;
-
         HideEventPanel();
         HideGuardEffect();
-
-        if (_zoneActive)
-        {
-            DeactivateZone();
-        }
-
+        if (_zoneActive) DeactivateZone();
         _player.Play("death");
         _stateLabel.Text = "DEAD - Tap to restart";
         _stateLabel.AddThemeColorOverride("font_color", Colors.White);
-
         Tween deathTween = CreateTween();
         deathTween.TweenProperty(_deathOverlay, "color:a", 0.6f, 2f);
-
-        Speak("\u304a\u75b2\u308c\u69d8...\u307e\u305f\u6b21\u306e\u4eba\u751f\u3067\u3002", 3f);
+        Speak("お疲れ様...また次の人生で。", 3f);
     }
 
+    // ──────────── アニメーション完了ハンドラ ────────────
     private void OnPlayerAnimationFinished()
     {
         if (_state == GameState.Dead && _player.Animation == "death")
         {
             int frameCount = _player.SpriteFrames.GetFrameCount("death");
-            if (frameCount > 0)
-            {
-                _player.Frame = frameCount - 1;
-            }
-
+            if (frameCount > 0) _player.Frame = frameCount - 1;
             _player.Stop();
             return;
         }
 
-        if ((_player.Animation == "hurt" || _player.Animation == "move") && _state == GameState.Playing)
+        // ガード解除アニメーション完了
+        if (_player.Animation == "guard_release")
         {
-            _player.Play(_isGuarding ? "guard" : "run");
+            _guardReleasing = false;
+            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+                _player.Play("run");
+            return;
+        }
+
+        // moveアニメーション完了 → runに復帰
+        if (_player.Animation == "move")
+        {
+            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+                _player.Play(_isGuarding ? "guard" : "run");
+            return;
+        }
+
+        // hurtアニメーション完了 → runに復帰
+        if (_player.Animation == "hurt")
+        {
+            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+                _player.Play(_isGuarding ? "guard" : "run");
         }
     }
 
+    // ──────────── エフェクト系 ────────────
     private void PlayNormalAvoidEffects(int col, int row)
     {
         Vector2 center = _cellCenters[col, row];
-        SpawnTransientTexture(_texFxCombo, center + new Vector2(0f, -60f), new Vector2(84f, 84f), 0.25f, 0.7f);
+        SpawnTransientTexture(_texFxCombo, center + new Vector2(0f, -60f), new Vector2(84f, 84f), 0.35f, 0.7f);
     }
 
     private void PlayJustAvoidEffects(int col, int row, bool lucky)
     {
         Vector2 center = _cellCenters[col, row];
-
         TriggerTimeStop(0.2f, 0.05f);
-
-        FlashCell(center, new Color(0.5f, 0.7f, 1f, 0.5f), 0.4f, 0f);
-        SpawnTransientTexture(_texFxJustAvoid, center, new Vector2(112f, 112f), 0.3f, 1f);
-
+        FlashCell(center, new Color(0.5f, 0.7f, 1f, 0.4f), 0.5f, 0f);
+        SpawnTransientTexture(_texFxJustAvoid, center, new Vector2(120f, 120f), 0.4f, 1f);
         _ = lucky;
     }
 
     private void PlayZoneBreakEffect(TextureRect? obstacleVisual, Vector2 center)
     {
         if (obstacleVisual != null)
-        {
             obstacleVisual.Modulate = new Color(1f, 1f, 1f, 0.3f);
-        }
 
-        SpawnTransientTexture(_texFxHit, center, new Vector2(92f, 92f), 0.25f, 0.9f);
+        SpawnTransientTexture(_texFxHit, center, new Vector2(100f, 100f), 0.3f, 0.9f);
 
         for (int i = 0; i < 8; i++)
         {
@@ -1647,8 +1622,8 @@ public partial class GridSampleManager : Node2D
             Vector2 target = shard.Position + (dir * _rng.RandfRange(50f, 100f));
 
             Tween tween = CreateTween();
-            tween.TweenProperty(shard, "position", target, 0.25f);
-            tween.Parallel().TweenProperty(shard, "modulate:a", 0f, 0.25f);
+            tween.TweenProperty(shard, "position", target, 0.3f);
+            tween.Parallel().TweenProperty(shard, "modulate:a", 0f, 0.3f);
             tween.TweenCallback(Callable.From(shard.QueueFree));
         }
     }
@@ -1656,42 +1631,29 @@ public partial class GridSampleManager : Node2D
     private void PlayHitEffects()
     {
         _hitFlashOverlay.Color = new Color(1f, 0f, 0f, 0f);
-
         Tween flash = CreateTween();
         flash.TweenProperty(_hitFlashOverlay, "color:a", 0.3f, 0.03f);
-        flash.TweenProperty(_hitFlashOverlay, "color:a", 0f, 0.15f);
+        flash.TweenProperty(_hitFlashOverlay, "color:a", 0f, 0.2f);
 
-        ShakeScreen(5f, 3, 0.04f);
-
-        SpawnTransientTexture(_texFxHit, _player.Position, new Vector2(96f, 96f), 0.3f, 1f);
+        ShakeScreen(5f, 3, 0.05f);
+        SpawnTransientTexture(_texFxHit, _player.Position, new Vector2(100f, 100f), 0.35f, 1f);
 
         _lifeFillStyle.BgColor = new Color(1f, 0.2f, 0.2f, 1f);
         _lifeBar.AddThemeStyleboxOverride("fill", _lifeFillStyle);
-
-        SceneTreeTimer timer = GetTree().CreateTimer(0.3f);
+        SceneTreeTimer timer = GetTree().CreateTimer(0.35f);
         timer.Timeout += UpdateLifeFillColor;
     }
 
     private void ShowScorePopup(int score, Vector2 position, bool isJust, bool lucky)
     {
         Color color = Colors.White;
-        int size = 32;
+        int size = 34;
         string text = $"+{score}";
 
-        if (isJust)
-        {
-            color = new Color(1f, 0.85f, 0.2f, 1f);
-            size = 48;
-        }
+        if (isJust) { color = new Color(1f, 0.85f, 0.2f, 1f); size = 50; }
+        if (lucky) { color = new Color(0.8f, 0.4f, 1f, 1f); size = 50; text = $"LUCKY! +{score}"; }
 
-        if (lucky)
-        {
-            color = new Color(0.8f, 0.4f, 1f, 1f);
-            size = 48;
-            text = $"LUCKY! +{score}";
-        }
-
-        ShowFloatingText(text, position, color, size, 0.8f);
+        ShowFloatingText(text, position, color, size, 1f);
     }
 
     private void ShowFloatingText(string text, Vector2 position, Color color, int fontSize, float duration)
@@ -1701,11 +1663,15 @@ public partial class GridSampleManager : Node2D
         label.Position = position;
         label.AddThemeFontSizeOverride("font_size", fontSize);
         label.AddThemeColorOverride("font_color", color);
+        label.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.7f));
+        label.AddThemeConstantOverride("outline_size", 4);
 
         _ui.AddChild(label);
 
         Tween tween = CreateTween();
-        tween.TweenProperty(label, "position", position + new Vector2(0f, -60f), duration);
+        tween.TweenProperty(label, "position", position + new Vector2(0f, -70f), duration)
+            .SetEase(Tween.EaseType.Out)
+            .SetTrans(Tween.TransitionType.Cubic);
         tween.Parallel().TweenProperty(label, "modulate:a", 0f, duration);
         tween.TweenCallback(Callable.From(label.QueueFree));
     }
@@ -1714,13 +1680,11 @@ public partial class GridSampleManager : Node2D
     {
         ColorRect flash = new();
         flash.Color = color;
-
         float half = (CellSize * 0.5f) + expand;
         flash.OffsetLeft = center.X - half;
         flash.OffsetTop = center.Y - half;
         flash.OffsetRight = center.X + half;
         flash.OffsetBottom = center.Y + half;
-
         _effectsRoot.AddChild(flash);
 
         Tween tween = CreateTween();
@@ -1730,65 +1694,46 @@ public partial class GridSampleManager : Node2D
 
     private void ShowGuardEffect()
     {
-        if (_guardFx != null)
-        {
-            return;
-        }
-
+        if (_guardFx != null) return;
         TextureRect fx = new();
         fx.Texture = _texFxGuard;
-        fx.Size = new Vector2(132f, 132f);
+        fx.Size = new Vector2(150f, 150f);
         fx.Modulate = new Color(1f, 1f, 1f, 0.65f);
         ConfigureTextureRectFill(fx);
-
         _effectsRoot.AddChild(fx);
         _guardFx = fx;
     }
 
     private void HideGuardEffect()
     {
-        if (_guardFx == null)
-        {
-            return;
-        }
-
+        if (_guardFx == null) return;
         _guardFx.QueueFree();
         _guardFx = null;
     }
 
     private void ShowZoneEffect()
     {
-        if (_zoneFx != null)
-        {
-            return;
-        }
-
+        if (_zoneFx != null) return;
         TextureRect fx = new();
         fx.Texture = _texFxZone;
-        fx.Size = new Vector2(168f, 168f);
+        fx.Size = new Vector2(180f, 180f);
         ConfigureTextureRectFill(fx);
-
         _effectsRoot.AddChild(fx);
         _zoneFx = fx;
 
         _zonePulseTween?.Kill();
         _zonePulseTween = CreateTween();
         _zonePulseTween.SetLoops();
-        _zonePulseTween.TweenProperty(fx, "scale", new Vector2(1.1f, 1.1f), 0.45f)
+        _zonePulseTween.TweenProperty(fx, "scale", new Vector2(1.1f, 1.1f), 0.5f)
             .From(new Vector2(0.9f, 0.9f));
-        _zonePulseTween.TweenProperty(fx, "scale", new Vector2(0.9f, 0.9f), 0.45f);
+        _zonePulseTween.TweenProperty(fx, "scale", new Vector2(0.9f, 0.9f), 0.5f);
     }
 
     private void HideZoneEffect()
     {
         _zonePulseTween?.Kill();
         _zonePulseTween = null;
-
-        if (_zoneFx == null)
-        {
-            return;
-        }
-
+        if (_zoneFx == null) return;
         _zoneFx.QueueFree();
         _zoneFx = null;
     }
@@ -1803,7 +1748,6 @@ public partial class GridSampleManager : Node2D
     private void PlayWhiteFlash(float maxAlpha, float duration)
     {
         _flashOverlay.Color = new Color(1f, 1f, 1f, 0f);
-
         Tween tween = CreateTween();
         tween.TweenProperty(_flashOverlay, "color:a", maxAlpha, duration * 0.5f);
         tween.TweenProperty(_flashOverlay, "color:a", 0f, duration * 0.5f);
@@ -1813,41 +1757,36 @@ public partial class GridSampleManager : Node2D
     {
         Label banner = new();
         banner.Text = "ZONE!!!";
-        banner.Position = new Vector2(390f, 900f);
+        banner.Position = new Vector2(340f, 860f);
         banner.Scale = Vector2.Zero;
-        banner.AddThemeFontSizeOverride("font_size", 72);
+        banner.AddThemeFontSizeOverride("font_size", 80);
         banner.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f, 1f));
+        banner.AddThemeColorOverride("font_outline_color", new Color(0.6f, 0.3f, 0f, 1f));
+        banner.AddThemeConstantOverride("outline_size", 6);
 
         _ui.AddChild(banner);
 
         Tween tween = CreateTween();
-        tween.TweenProperty(banner, "scale", new Vector2(1.2f, 1.2f), 0.2f)
+        tween.TweenProperty(banner, "scale", new Vector2(1.2f, 1.2f), 0.25f)
             .SetEase(Tween.EaseType.Out)
             .SetTrans(Tween.TransitionType.Back);
         tween.TweenProperty(banner, "scale", Vector2.One, 0.2f)
-            .SetEase(Tween.EaseType.Out)
-            .SetTrans(Tween.TransitionType.Quad);
-        tween.TweenInterval(1.1f);
-        tween.TweenProperty(banner, "modulate:a", 0f, 0.4f);
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenInterval(1.2f);
+        tween.TweenProperty(banner, "modulate:a", 0f, 0.5f);
         tween.TweenCallback(Callable.From(banner.QueueFree));
     }
 
     private void ShakeScreen(float strength, int swings, float segment)
     {
         _shakeTween?.Kill();
-
         Position = Vector2.Zero;
-
         _shakeTween = CreateTween();
         for (int i = 0; i < swings; i++)
         {
-            Vector2 offset = new(
-                _rng.RandfRange(-strength, strength),
-                _rng.RandfRange(-strength, strength));
-
+            Vector2 offset = new(_rng.RandfRange(-strength, strength), _rng.RandfRange(-strength, strength));
             _shakeTween.TweenProperty(this, "position", offset, segment);
         }
-
         _shakeTween.TweenProperty(this, "position", Vector2.Zero, segment);
     }
 
@@ -1859,7 +1798,6 @@ public partial class GridSampleManager : Node2D
         fx.Position = center - (size * 0.5f);
         fx.Modulate = new Color(1f, 1f, 1f, alpha);
         ConfigureTextureRectFill(fx);
-
         _effectsRoot.AddChild(fx);
 
         Tween tween = CreateTween();
@@ -1867,25 +1805,21 @@ public partial class GridSampleManager : Node2D
         tween.TweenCallback(Callable.From(fx.QueueFree));
     }
 
+    // ──────────── 画面装飾 ────────────
     private void CreateScreenAuras()
     {
         _leftAura = new ColorRect();
         _leftAura.Color = new Color(0.2f, 0.4f, 1f, 0f);
-        _leftAura.OffsetLeft = 0f;
-        _leftAura.OffsetTop = 0f;
-        _leftAura.OffsetRight = 40f;
-        _leftAura.OffsetBottom = 1920f;
+        _leftAura.OffsetLeft = 0f; _leftAura.OffsetTop = 0f;
+        _leftAura.OffsetRight = 40f; _leftAura.OffsetBottom = 1920f;
 
         _rightAura = new ColorRect();
         _rightAura.Color = new Color(0.2f, 0.4f, 1f, 0f);
-        _rightAura.OffsetLeft = 1040f;
-        _rightAura.OffsetTop = 0f;
-        _rightAura.OffsetRight = 1080f;
-        _rightAura.OffsetBottom = 1920f;
+        _rightAura.OffsetLeft = 1040f; _rightAura.OffsetTop = 0f;
+        _rightAura.OffsetRight = 1080f; _rightAura.OffsetBottom = 1920f;
 
         _ui.AddChild(_leftAura);
         _ui.AddChild(_rightAura);
-
         _leftAura.MoveToFront();
         _rightAura.MoveToFront();
     }
@@ -1899,55 +1833,25 @@ public partial class GridSampleManager : Node2D
     private void SetCellBorderZoneColor(bool enabled)
     {
         Color borderColor = enabled ? CellBorderZoneColor : CellBorderDefaultColor;
-
         for (int row = 0; row < Rows; row++)
-        {
             for (int col = 0; col < Columns; col++)
-            {
                 _cellBorders[col, row].Color = borderColor;
-            }
-        }
     }
 
+    // ──────────── スワイプヒント ────────────
     private void CreateSwipeHint()
     {
-        if (_hintShown || _swipeHint != null)
-        {
-            return;
-        }
+        if (_hintShown || _swipeHint != null) return;
 
         Node2D root = new();
         root.Name = "SwipeHint";
-        root.Position = new Vector2(540f, 1650f);
-        root.Scale = new Vector2(0.9f, 0.9f);
+        root.Position = new Vector2(540f, 1600f);
+        root.Scale = new Vector2(1f, 1f);
 
-        root.AddChild(CreateHintArrow(new[]
-        {
-            new Vector2(-20f, 15f),
-            new Vector2(20f, 15f),
-            new Vector2(0f, -15f),
-        }, new Vector2(0f, -60f)));
-
-        root.AddChild(CreateHintArrow(new[]
-        {
-            new Vector2(-20f, -15f),
-            new Vector2(20f, -15f),
-            new Vector2(0f, 15f),
-        }, new Vector2(0f, 60f)));
-
-        root.AddChild(CreateHintArrow(new[]
-        {
-            new Vector2(15f, -20f),
-            new Vector2(15f, 20f),
-            new Vector2(-15f, 0f),
-        }, new Vector2(-60f, 0f)));
-
-        root.AddChild(CreateHintArrow(new[]
-        {
-            new Vector2(-15f, -20f),
-            new Vector2(-15f, 20f),
-            new Vector2(15f, 0f),
-        }, new Vector2(60f, 0f)));
+        root.AddChild(CreateHintArrow(new[] { new Vector2(-24f, 18f), new Vector2(24f, 18f), new Vector2(0f, -18f) }, new Vector2(0f, -70f)));
+        root.AddChild(CreateHintArrow(new[] { new Vector2(-24f, -18f), new Vector2(24f, -18f), new Vector2(0f, 18f) }, new Vector2(0f, 70f)));
+        root.AddChild(CreateHintArrow(new[] { new Vector2(18f, -24f), new Vector2(18f, 24f), new Vector2(-18f, 0f) }, new Vector2(-70f, 0f)));
+        root.AddChild(CreateHintArrow(new[] { new Vector2(-18f, -24f), new Vector2(-18f, 24f), new Vector2(18f, 0f) }, new Vector2(70f, 0f)));
 
         _ui.AddChild(root);
         _swipeHint = root;
@@ -1955,38 +1859,20 @@ public partial class GridSampleManager : Node2D
         _swipeHintPulseTween?.Kill();
         _swipeHintPulseTween = CreateTween();
         _swipeHintPulseTween.SetLoops();
-        _swipeHintPulseTween.TweenProperty(root, "scale", new Vector2(1.1f, 1.1f), 0.6f).From(new Vector2(0.9f, 0.9f));
-        _swipeHintPulseTween.TweenProperty(root, "scale", new Vector2(0.9f, 0.9f), 0.6f);
+        _swipeHintPulseTween.TweenProperty(root, "scale", new Vector2(1.15f, 1.15f), 0.7f).From(new Vector2(0.9f, 0.9f));
+        _swipeHintPulseTween.TweenProperty(root, "scale", new Vector2(0.9f, 0.9f), 0.7f);
     }
 
     private void DismissSwipeHint(bool immediate)
     {
         _hintShown = true;
-
         _swipeHintPulseTween?.Kill();
-
-        if (_swipeHint == null)
-        {
-            return;
-        }
-
-        if (immediate)
-        {
-            _swipeHint.QueueFree();
-            _swipeHint = null;
-            return;
-        }
+        if (_swipeHint == null) return;
+        if (immediate) { _swipeHint.QueueFree(); _swipeHint = null; return; }
 
         Tween fade = CreateTween();
         fade.TweenProperty(_swipeHint, "modulate:a", 0f, 0.5f);
-        fade.TweenCallback(Callable.From(() =>
-        {
-            if (_swipeHint != null)
-            {
-                _swipeHint.QueueFree();
-                _swipeHint = null;
-            }
-        }));
+        fade.TweenCallback(Callable.From(() => { if (_swipeHint != null) { _swipeHint.QueueFree(); _swipeHint = null; } }));
     }
 
     private static Polygon2D CreateHintArrow(Vector2[] points, Vector2 position)
@@ -1994,36 +1880,28 @@ public partial class GridSampleManager : Node2D
         Polygon2D arrow = new();
         arrow.Polygon = points;
         arrow.Position = position;
-        arrow.Color = new Color(1f, 1f, 1f, 0.25f);
+        arrow.Color = new Color(1f, 1f, 1f, 0.3f);
         return arrow;
     }
 
+    // ──────────── エフェクト位置更新 ────────────
     private void UpdateAttachedEffectsPosition()
     {
         if (_guardFx != null)
-        {
-            _guardFx.Position = _player.Position + new Vector2(-66f, -66f);
-        }
-
+            _guardFx.Position = _player.Position + new Vector2(-75f, -75f);
         if (_zoneFx != null)
-        {
-            _zoneFx.Position = _player.Position + new Vector2(-84f, -84f);
-        }
+            _zoneFx.Position = _player.Position + new Vector2(-90f, -90f);
     }
 
     private void UpdateCellColors()
     {
         for (int row = 0; row < Rows; row++)
-        {
             for (int col = 0; col < Columns; col++)
-            {
                 _cellInners[col, row].Color = CellDefaultColor;
-            }
-        }
-
         _cellInners[_playerCol, _playerRow].Color = CellPlayerColor;
     }
 
+    // ──────────── HUD更新 ────────────
     private void UpdateHud()
     {
         _phaseLabel.Text = "青年期";
@@ -2034,7 +1912,6 @@ public partial class GridSampleManager : Node2D
 
         _lifeBar.MaxValue = BaseLife;
         _lifeBar.Value = _life;
-
         UpdateLifeFillColor();
 
         if (_state == GameState.Dead)
@@ -2042,7 +1919,6 @@ public partial class GridSampleManager : Node2D
             _stateLabel.Text = "DEAD - Tap to restart";
             return;
         }
-
         if (_state == GameState.Cleared)
         {
             _stateLabel.Text = "ALL WAVES CLEAR!";
@@ -2054,68 +1930,57 @@ public partial class GridSampleManager : Node2D
 
         if (_state == GameState.Idle)
         {
-            _stateLabel.Text = _allWavesCleared ? "ALL WAVES CLEAR!" : "Tap or press any key to start";
+            _stateLabel.Text = _allWavesCleared ? "ALL WAVES CLEAR!" : "Tap to start";
             return;
         }
-
         if (_state == GameState.WaitingChoice)
         {
             _stateLabel.Text = "イベントを選択して次へ";
             return;
         }
 
-        _stateLabel.Text = _isGuarding ? "Guarding" : "Playing";
+        _stateLabel.Text = _isGuarding ? "Guarding" : "";
     }
 
     private void UpdateLifeFillColor()
     {
         Color color;
-        if (_life <= 25f)
-        {
-            color = new Color(0.9f, 0.2f, 0.2f, 1f);
-        }
-        else if (_life <= 50f)
-        {
-            color = new Color(0.9f, 0.8f, 0.2f, 1f);
-        }
-        else
-        {
-            color = new Color(0.2f, 0.8f, 0.3f, 1f);
-        }
+        if (_life <= 25f) color = new Color(0.9f, 0.2f, 0.2f, 1f);
+        else if (_life <= 50f) color = new Color(0.9f, 0.8f, 0.2f, 1f);
+        else color = new Color(0.2f, 0.8f, 0.3f, 1f);
 
         _lifeFillStyle.BgColor = color;
         _lifeBar.AddThemeStyleboxOverride("fill", _lifeFillStyle);
     }
 
+    // ──────────── ナビゲーター ────────────
     private void Speak(string text, float duration = 3f)
     {
         _navigatorLabel.Text = text;
-
         _speechTween?.Kill();
-
         _naviBubble.Visible = true;
         _navigatorLabel.Visible = true;
-
         _speechTween = CreateTween();
-        _speechTween.TweenProperty(_naviBubble, "modulate:a", 1f, 0.2f);
-        _speechTween.Parallel().TweenProperty(_navigatorLabel, "modulate:a", 1f, 0.2f);
+        _speechTween.TweenProperty(_naviBubble, "modulate:a", 1f, 0.25f);
+        _speechTween.Parallel().TweenProperty(_navigatorLabel, "modulate:a", 1f, 0.25f);
         _speechTween.TweenInterval(duration);
-        _speechTween.TweenProperty(_naviBubble, "modulate:a", 0f, 0.3f);
-        _speechTween.Parallel().TweenProperty(_navigatorLabel, "modulate:a", 0f, 0.3f);
+        _speechTween.TweenProperty(_naviBubble, "modulate:a", 0f, 0.4f);
+        _speechTween.Parallel().TweenProperty(_navigatorLabel, "modulate:a", 0f, 0.4f);
     }
 
     private string GetDirectionCallout(ObstacleDirection direction)
     {
         return direction switch
         {
-            ObstacleDirection.Right => "\u53f3\u304b\u3089\u6765\u308b\u305e\uff01",
-            ObstacleDirection.Left => "\u5de6\u304b\u3089\u6765\u308b\u305e\uff01",
-            ObstacleDirection.Top => "\u4e0a\u304b\u3089\u6765\u308b\u305e\uff01",
-            ObstacleDirection.Down => "\u4e0b\u304b\u3089\u6765\u308b\u305e\uff01",
-            _ => "\u6765\u308b\u3088\uff01",
+            ObstacleDirection.Right => "右から来るぞ！",
+            ObstacleDirection.Left => "左から来るぞ！",
+            ObstacleDirection.Top => "上から来るぞ！",
+            ObstacleDirection.Down => "下から来るぞ！",
+            _ => "来るよ！",
         };
     }
 
+    // ──────────── ジオメトリ（反射バグ修正） ────────────
     private static float GetWarningArrowRotation(ObstacleDirection direction)
     {
         return direction switch
@@ -2131,23 +1996,14 @@ public partial class GridSampleManager : Node2D
     private static Texture2D LoadRequiredTexture(string path)
     {
         Texture2D texture = GD.Load<Texture2D>(path);
-        if (texture == null)
-        {
-            throw new InvalidOperationException($"Texture not found: {path}");
-        }
-
+        if (texture == null) throw new InvalidOperationException($"Texture not found: {path}");
         return texture;
     }
 
     private static void ConfigureTextureRectFill(TextureRect textureRect)
     {
         textureRect.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        textureRect.StretchMode = TextureRect.StretchModeEnum.Scale;
-    }
-
-    private void SpawnObstacleVisualAt(TextureRect visual, Vector2 center)
-    {
-        visual.Position = center - new Vector2(48f, 48f);
+        textureRect.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
     }
 
     private Texture2D ResolveObstacleTexture(ObstacleDirection direction)
@@ -2174,49 +2030,66 @@ public partial class GridSampleManager : Node2D
         };
     }
 
+    /// <summary>
+    /// 障害物の位置を計算（反射バグ修正版）。
+    /// t=0..1: 画面外→セル0、t=1..2: セル0→セル1、t=2..3: セル1→セル2、t=3..4: セル2→画面外
+    /// t>=4 で退出完了。
+    /// </summary>
     private Vector2 ComputeObstaclePosition(ObstacleEntry entry, float t)
     {
         Vector2 outsideStart = GetOutsidePoint(entry.Direction, entry.Lane, entering: true);
         Vector2 outsideEnd = GetOutsidePoint(entry.Direction, entry.Lane, entering: false);
 
-        Vector2 c0 = _cellCenters[GetPathCell(entry.Direction, entry.Lane, 0).X, GetPathCell(entry.Direction, entry.Lane, 0).Y];
-        Vector2 c1 = _cellCenters[GetPathCell(entry.Direction, entry.Lane, 1).X, GetPathCell(entry.Direction, entry.Lane, 1).Y];
-        Vector2 c2 = _cellCenters[GetPathCell(entry.Direction, entry.Lane, 2).X, GetPathCell(entry.Direction, entry.Lane, 2).Y];
+        Vector2I c0i = GetPathCell(entry.Direction, entry.Lane, 0);
+        Vector2I c1i = GetPathCell(entry.Direction, entry.Lane, 1);
+        Vector2I c2i = GetPathCell(entry.Direction, entry.Lane, 2);
+        Vector2 c0 = _cellCenters[c0i.X, c0i.Y];
+        Vector2 c1 = _cellCenters[c1i.X, c1i.Y];
+        Vector2 c2 = _cellCenters[c2i.X, c2i.Y];
 
-        if (t < 1f)
-        {
-            return outsideStart.Lerp(c0, Mathf.Clamp(t, 0f, 1f));
-        }
-
-        if (t < 2f)
-        {
-            return c0.Lerp(c1, t - 1f);
-        }
-
-        if (t < 3f)
-        {
-            return c1.Lerp(c2, t - 2f);
-        }
-
-        return c2.Lerp(outsideEnd, Mathf.Clamp(t - 3f, 0f, 1f));
+        if (t <= 0f) return outsideStart;
+        if (t < 1f) return outsideStart.Lerp(c0, t);
+        if (t < 2f) return c0.Lerp(c1, t - 1f);
+        if (t < 3f) return c1.Lerp(c2, t - 2f);
+        if (t < 4f) return c2.Lerp(outsideEnd, t - 3f);
+        return outsideEnd;
     }
 
+    /// <summary>
+    /// 画面外の座標（反射バグ修正版）。
+    /// entering=true: 侵入側の画面外。entering=false: 退出側の画面外。
+    /// 退出側は侵入側の反対方向に飛んでいく。
+    /// </summary>
     private Vector2 GetOutsidePoint(ObstacleDirection direction, int lane, bool entering)
     {
-        Vector2I edgeCell = entering
-            ? GetPathCell(direction, lane, 0)
-            : GetPathCell(direction, lane, 2);
-
-        Vector2 center = _cellCenters[edgeCell.X, edgeCell.Y];
-
-        return direction switch
+        if (entering)
         {
-            ObstacleDirection.Right => center + new Vector2(360f, 0f),
-            ObstacleDirection.Left => center + new Vector2(-360f, 0f),
-            ObstacleDirection.Top => center + new Vector2(0f, -360f),
-            ObstacleDirection.Down => center + new Vector2(0f, 360f),
-            _ => center,
-        };
+            // 侵入: 最初のセル(cellIndex=0)から進行方向の反対側にオフセット
+            Vector2I edgeCell = GetPathCell(direction, lane, 0);
+            Vector2 center = _cellCenters[edgeCell.X, edgeCell.Y];
+            return direction switch
+            {
+                ObstacleDirection.Right => center + new Vector2(CellSize + 80f, 0f),   // 右の外から入る
+                ObstacleDirection.Left => center + new Vector2(-(CellSize + 80f), 0f), // 左の外から入る
+                ObstacleDirection.Top => center + new Vector2(0f, -(CellSize + 80f)),  // 上の外から入る
+                ObstacleDirection.Down => center + new Vector2(0f, CellSize + 80f),    // 下の外から入る
+                _ => center,
+            };
+        }
+        else
+        {
+            // 退出: 最後のセル(cellIndex=2)から進行方向にオフセット
+            Vector2I edgeCell = GetPathCell(direction, lane, 2);
+            Vector2 center = _cellCenters[edgeCell.X, edgeCell.Y];
+            return direction switch
+            {
+                ObstacleDirection.Right => center + new Vector2(-(CellSize + 80f), 0f),  // 右→左に抜ける
+                ObstacleDirection.Left => center + new Vector2(CellSize + 80f, 0f),      // 左→右に抜ける
+                ObstacleDirection.Top => center + new Vector2(0f, CellSize + 80f),       // 上→下に抜ける
+                ObstacleDirection.Down => center + new Vector2(0f, -(CellSize + 80f)),   // 下→上に抜ける
+                _ => center,
+            };
+        }
     }
 
     private bool HasIncomingObstacleForCell(int col, int row, float secondsAhead)
@@ -2226,46 +2099,32 @@ public partial class GridSampleManager : Node2D
         for (int i = 0; i < _obstacleStates.Count; i++)
         {
             ObstacleState state = _obstacleStates[i];
-            if (state.IsFinished)
-            {
-                continue;
-            }
+            if (state.IsFinished) continue;
 
             float speed = Mathf.Max(0.0001f, state.Entry.SpeedPerCell);
             for (int cellIndex = 0; cellIndex < 3; cellIndex++)
             {
                 Vector2I pathCell = GetPathCell(state.Entry.Direction, state.Entry.Lane, cellIndex);
-                if (pathCell.X != col || pathCell.Y != row)
-                {
-                    continue;
-                }
+                if (pathCell.X != col || pathCell.Y != row) continue;
 
                 float reachTime = state.Entry.SpawnTime + (cellIndex * speed);
-                if (reachTime >= _waveElapsed && reachTime <= windowEnd)
-                {
-                    return true;
-                }
+                if (reachTime >= _waveElapsed && reachTime <= windowEnd) return true;
             }
         }
-
         return false;
     }
 
+    // ──────────── クリーンアップ ────────────
     private void RemoveWarningVisual(ref ObstacleState state)
     {
         if (state.WarningRects != null)
         {
             for (int i = 0; i < state.WarningRects.Length; i++)
-            {
                 state.WarningRects[i].QueueFree();
-            }
-
             state.WarningRects = null;
         }
-
         state.WarningArrow?.QueueFree();
         state.WarningArrow = null;
-
         state.WarningOrder?.QueueFree();
         state.WarningOrder = null;
     }
@@ -2274,38 +2133,25 @@ public partial class GridSampleManager : Node2D
     {
         state.IsActive = false;
         state.IsFinished = true;
-
         state.Visual?.QueueFree();
         state.Visual = null;
-
         RemoveWarningVisual(ref state);
     }
 
     private void ClearObstacleVisuals()
     {
-        foreach (Node child in _obstaclesRoot.GetChildren())
-        {
-            child.QueueFree();
-        }
-
+        foreach (Node child in _obstaclesRoot.GetChildren()) child.QueueFree();
         _obstacleStates.Clear();
     }
 
     private void ClearWarningVisuals()
     {
-        foreach (Node child in _warningRoot.GetChildren())
-        {
-            child.QueueFree();
-        }
+        foreach (Node child in _warningRoot.GetChildren()) child.QueueFree();
     }
 
     private void ClearTransientEffects()
     {
-        foreach (Node child in _effectsRoot.GetChildren())
-        {
-            child.QueueFree();
-        }
-
+        foreach (Node child in _effectsRoot.GetChildren()) child.QueueFree();
         _guardFx = null;
         _zoneFx = null;
         _zonePulseTween?.Kill();
@@ -2314,11 +2160,7 @@ public partial class GridSampleManager : Node2D
 
     private string PickRandom(string[] options)
     {
-        if (options.Length == 0)
-        {
-            return string.Empty;
-        }
-
+        if (options.Length == 0) return string.Empty;
         return options[_rng.RandiRange(0, options.Length - 1)];
     }
 }
