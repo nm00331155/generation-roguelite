@@ -1,0 +1,399 @@
+{
+  "events": [
+    {
+      "id": "encounter_001",
+      "category": "encounter",
+      "title": "旅の商人",
+      "text": "道端で商人に呼び止められた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "品を見せてもらう", "risk": 1, "success_stat": "intelligence", "success_threshold": 10, "success_effects": { "intelligence": 1, "luck": 1, "wealth": -3 }, "success_text": "掘り出し物を見つけた。", "fail_effects": { "wealth": -6 }, "fail_text": "粗悪品を買わされた。", "drop_chance": 0.6 },
+        { "text": "無視して進む", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "何事もなく進んだ。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "encounter_002",
+      "category": "encounter",
+      "title": "辻試合",
+      "text": "腕試しの挑戦者が待ち構えている。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "正面から受ける", "risk": 2, "success_stat": "vitality", "success_threshold": 12, "success_effects": { "vitality": 1, "wealth": 2 }, "success_text": "名声と報酬を得た。", "fail_effects": { "vitality": -1, "wealth": -1 }, "fail_text": "負傷してしまった。", "drop_chance": 0.5 },
+        { "text": "丁重に辞退する", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "角を立てずに済んだ。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "encounter_003",
+      "category": "encounter",
+      "title": "迷子の護衛",
+      "text": "迷子の少年を街まで送る依頼を受けた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "最短路で急ぐ", "risk": 2, "success_stat": "luck", "success_threshold": 11, "success_effects": { "luck": 2, "wealth": 1 }, "success_text": "無事に送り届けた。", "fail_effects": { "vitality": -1 }, "fail_text": "途中で転倒した。", "drop_chance": 0.4 },
+        { "text": "大通りを使う", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "安全に到着した。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "encounter_004",
+      "category": "encounter",
+      "title": "夜の見回り",
+      "text": "夜道の見回り役を頼まれた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "積極的に巡回", "risk": 2, "success_stat": "vitality", "success_threshold": 12, "success_effects": { "vitality": 1, "charisma": 1 }, "success_text": "治安に貢献できた。", "fail_effects": { "vitality": -1, "luck": -1 }, "fail_text": "不意打ちを受けた。", "drop_chance": 0.4 },
+        { "text": "衛兵と連携する", "risk": 1, "success_stat": "charisma", "success_threshold": 9, "success_effects": { "charisma": 1, "intelligence": 1 }, "success_text": "効率よく見回れた。", "fail_effects": { "charisma": -1 }, "fail_text": "連携がうまくいかなかった。", "drop_chance": 0.2 }
+      ]
+    },
+    {
+      "id": "encounter_005",
+      "category": "encounter",
+      "title": "橋番との交渉",
+      "text": "橋の通行料が急に値上げされた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "値下げ交渉する", "risk": 1, "success_stat": "charisma", "success_threshold": 11, "success_effects": { "charisma": 1, "wealth": 2 }, "success_text": "交渉に成功した。", "fail_effects": { "wealth": -3 }, "fail_text": "余計に支払う羽目に。", "drop_chance": 0.3 },
+        { "text": "そのまま払う", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1, "wealth": -1 }, "success_text": "時間を節約できた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+
+    {
+      "id": "discovery_001",
+      "category": "discovery",
+      "title": "苔むした箱",
+      "text": "遺跡の隅で古い箱を見つけた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "罠を調べて開ける", "risk": 1, "success_stat": "intelligence", "success_threshold": 11, "success_effects": { "intelligence": 2, "wealth": 2 }, "success_text": "安全に回収できた。", "fail_effects": { "vitality": -1 }, "fail_text": "仕掛けに引っかかった。", "drop_chance": 0.6 },
+        { "text": "手を付けず離れる", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "危険を避けた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "discovery_002",
+      "category": "discovery",
+      "title": "隠し通路",
+      "text": "壁の継ぎ目に不自然な空間がある。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "内部を探索する", "risk": 2, "success_stat": "luck", "success_threshold": 12, "success_effects": { "luck": 2, "wealth": 3 }, "success_text": "宝材を見つけた。", "fail_effects": { "vitality": -1, "luck": -1 }, "fail_text": "足場を崩してしまう。", "drop_chance": 0.5 },
+        { "text": "目印だけ残す", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "intelligence": 1 }, "success_text": "次に備えて記録した。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.1 }
+      ]
+    },
+    {
+      "id": "discovery_003",
+      "category": "discovery",
+      "title": "古文書",
+      "text": "湿った棚から読める古文書が出てきた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "解読に挑む", "risk": 1, "success_stat": "intelligence", "success_threshold": 12, "success_effects": { "intelligence": 2, "luck": 1 }, "success_text": "貴重な知見を得た。", "fail_effects": { "intelligence": -1 }, "fail_text": "読み違えてしまった。", "drop_chance": 0.2 },
+        { "text": "保管庫に運ぶ", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "感謝された。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "discovery_004",
+      "category": "discovery",
+      "title": "奇妙な鉱石",
+      "text": "光を反射する未知の鉱石を拾った。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "分析して売却", "risk": 1, "success_stat": "intelligence", "success_threshold": 10, "success_effects": { "intelligence": 1, "wealth": 3 }, "success_text": "価値を見抜いた。", "fail_effects": { "wealth": -1 }, "fail_text": "買い叩かれた。", "drop_chance": 0.3 },
+        { "text": "記念に保管", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "運気が上がった気がした。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "discovery_005",
+      "category": "discovery",
+      "title": "水脈の地図",
+      "text": "古地図に未発見の水脈情報が記されていた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "掘削計画を立てる", "risk": 2, "success_stat": "intelligence", "success_threshold": 12, "success_effects": { "intelligence": 1, "wealth": 4 }, "success_text": "新たな収入源を得た。", "fail_effects": { "wealth": -2 }, "fail_text": "掘削費が無駄になった。", "drop_chance": 0.4 },
+        { "text": "共有して終える", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "地域に貢献した。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+
+    {
+      "id": "social_001",
+      "category": "social",
+      "title": "収穫祭",
+      "text": "収穫祭で代表挨拶を任された。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "壇上で話す", "risk": 1, "success_stat": "charisma", "success_threshold": 11, "success_effects": { "charisma": 2, "luck": 1 }, "success_text": "大きな拍手を受けた。", "fail_effects": { "charisma": -1 }, "fail_text": "言葉に詰まってしまった。", "drop_chance": 0.2 },
+        { "text": "裏方に回る", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "intelligence": 1 }, "success_text": "運営を円滑に進めた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "social_002",
+      "category": "social",
+      "title": "仲裁依頼",
+      "text": "近隣同士の口論を仲裁してほしいと頼まれた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "双方の話を聞く", "risk": 1, "success_stat": "charisma", "success_threshold": 12, "success_effects": { "charisma": 2, "intelligence": 1 }, "success_text": "丸く収まった。", "fail_effects": { "charisma": -1, "luck": -1 }, "fail_text": "さらにこじれた。", "drop_chance": 0.2 },
+        { "text": "第三者に委ねる", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "大事にならず済んだ。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "social_003",
+      "category": "social",
+      "title": "求愛の場",
+      "text": "舞踏会で自己紹介の機会が訪れた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "堂々と話す", "risk": 1, "success_stat": "charisma", "success_threshold": 11, "success_effects": { "charisma": 2, "luck": 1 }, "success_text": "印象を残せた。", "fail_effects": { "charisma": -1 }, "fail_text": "緊張してしまった。", "drop_chance": 0.2 },
+        { "text": "会話役を頼む", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "無難に切り抜けた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "social_004",
+      "category": "social",
+      "title": "評議会",
+      "text": "地域の評議会で意見を求められた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "改善案を提案", "risk": 1, "success_stat": "intelligence", "success_threshold": 11, "success_effects": { "intelligence": 1, "charisma": 1, "wealth": 1 }, "success_text": "採択され評価が上がった。", "fail_effects": { "charisma": -1 }, "fail_text": "理解を得られなかった。", "drop_chance": 0.1 },
+        { "text": "賛同に回る", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "対立を避けられた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "social_005",
+      "category": "social",
+      "title": "門弟の相談",
+      "text": "若者が進路の相談に訪れた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "時間をかけて助言", "risk": 1, "success_stat": "charisma", "success_threshold": 10, "success_effects": { "charisma": 1, "intelligence": 1 }, "success_text": "信頼を得た。", "fail_effects": { "vitality": -1 }, "fail_text": "疲れが残った。", "drop_chance": 0.1 },
+        { "text": "簡単な助言だけ", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "vitality": 1 }, "success_text": "負担を抑えた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+
+    {
+      "id": "disaster_001",
+      "category": "disaster",
+      "title": "暴風警報",
+      "text": "暴風が接近し、備えが必要になった。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "外回りを補強", "risk": 2, "success_stat": "vitality", "success_threshold": 12, "success_effects": { "vitality": 1, "wealth": 1 }, "success_text": "被害を最小化した。", "fail_effects": { "vitality": -2, "wealth": -2 }, "fail_text": "補強が間に合わなかった。", "drop_chance": 0.2 },
+        { "text": "屋内待機", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "無事にやり過ごした。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "disaster_002",
+      "category": "disaster",
+      "title": "疫病の兆し",
+      "text": "街で体調不良者が増えている。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "防疫を主導", "risk": 2, "success_stat": "intelligence", "success_threshold": 12, "success_effects": { "intelligence": 1, "charisma": 1 }, "success_text": "拡大を抑えられた。", "fail_effects": { "vitality": -2, "charisma": -1 }, "fail_text": "対応が遅れた。", "drop_chance": 0.2 },
+        { "text": "接触を減らす", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "vitality": 1 }, "success_text": "消耗を抑えた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "disaster_003",
+      "category": "disaster",
+      "title": "落石地帯",
+      "text": "通行路で落石が相次いでいる。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "強行突破", "risk": 2, "success_stat": "vitality", "success_threshold": 13, "success_effects": { "wealth": 3, "luck": 1 }, "success_text": "荷を守り切った。", "fail_effects": { "vitality": -2, "wealth": -2 }, "fail_text": "被害を受けた。", "drop_chance": 0.3 },
+        { "text": "迂回路を探す", "risk": 1, "success_stat": "intelligence", "success_threshold": 10, "success_effects": { "intelligence": 1 }, "success_text": "安全に移動できた。", "fail_effects": { "wealth": -1 }, "fail_text": "時間を失った。", "drop_chance": 0.1 }
+      ]
+    },
+    {
+      "id": "disaster_004",
+      "category": "disaster",
+      "title": "治安崩壊",
+      "text": "夜間の襲撃が増え、緊張が続く。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "警備に参加", "risk": 2, "success_stat": "vitality", "success_threshold": 12, "success_effects": { "charisma": 1, "wealth": 1 }, "success_text": "街の安全に貢献した。", "fail_effects": { "vitality": -2, "luck": -1 }, "fail_text": "負傷してしまった。", "drop_chance": 0.2 },
+        { "text": "移動を控える", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "vitality": 1 }, "success_text": "被害を避けた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "disaster_005",
+      "category": "disaster",
+      "title": "橋の崩落",
+      "text": "主要な橋が崩れ、物流が止まった。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "復旧を急ぐ", "risk": 2, "success_stat": "vitality", "success_threshold": 12, "success_effects": { "vitality": 1, "wealth": 2 }, "success_text": "復旧に成功した。", "fail_effects": { "vitality": -1, "wealth": -2 }, "fail_text": "疲弊だけが残った。", "drop_chance": 0.2 },
+        { "text": "輸送計画を再設計", "risk": 1, "success_stat": "intelligence", "success_threshold": 11, "success_effects": { "intelligence": 1, "wealth": 1 }, "success_text": "損失を抑えた。", "fail_effects": { "wealth": -1 }, "fail_text": "混乱が長引いた。", "drop_chance": 0.1 }
+      ]
+    },
+
+    {
+      "id": "fortune_001",
+      "category": "fortune",
+      "title": "追い風",
+      "text": "予想外の追い風で事業が加速した。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "機会を活かす", "risk": 1, "success_stat": "luck", "success_threshold": 9, "success_effects": { "luck": 2, "wealth": 3 }, "success_text": "幸運を利益に変えた。", "fail_effects": { "wealth": -1 }, "fail_text": "手を広げすぎた。", "drop_chance": 0.5 },
+        { "text": "堅実に積む", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "wealth": 2 }, "success_text": "安定した成果を得た。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.2 }
+      ]
+    },
+    {
+      "id": "fortune_002",
+      "category": "fortune",
+      "title": "拾い物",
+      "text": "道で価値のある落とし物を拾った。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "落とし主を探す", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 2, "luck": 1 }, "success_text": "信頼を得た。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.1 },
+        { "text": "換金する", "risk": 1, "success_stat": "luck", "success_threshold": 10, "success_effects": { "wealth": 4 }, "success_text": "高値で売れた。", "fail_effects": { "wealth": -1 }, "fail_text": "価値が低かった。", "drop_chance": 0.3 }
+      ]
+    },
+    {
+      "id": "fortune_003",
+      "category": "fortune",
+      "title": "祝福の噂",
+      "text": "幸運の井戸の噂を聞きつけた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "参拝する", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 2 }, "success_text": "不思議と運が向いた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.2 },
+        { "text": "寄付をする", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1, "luck": 1, "wealth": -1 }, "success_text": "良い縁が増えた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.2 }
+      ]
+    },
+    {
+      "id": "fortune_004",
+      "category": "fortune",
+      "title": "臨時報酬",
+      "text": "過去の働きが評価され臨時報酬が届いた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "再投資する", "risk": 1, "success_stat": "intelligence", "success_threshold": 10, "success_effects": { "intelligence": 1, "wealth": 3 }, "success_text": "効率よく増やせた。", "fail_effects": { "wealth": -1 }, "fail_text": "判断を誤った。", "drop_chance": 0.2 },
+        { "text": "貯蓄に回す", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "wealth": 2 }, "success_text": "堅実に蓄えた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "fortune_005",
+      "category": "fortune",
+      "title": "偶然の縁",
+      "text": "偶然の再会が新たな商機を連れてきた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "共同提案を受ける", "risk": 1, "success_stat": "charisma", "success_threshold": 10, "success_effects": { "charisma": 1, "wealth": 3 }, "success_text": "良い協業が生まれた。", "fail_effects": { "wealth": -1 }, "fail_text": "話が流れた。", "drop_chance": 0.3 },
+        { "text": "挨拶だけで終える", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "次につながる縁を残した。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+
+    {
+      "id": "training_001",
+      "category": "training",
+      "title": "朝鍛錬",
+      "text": "朝の鍛錬に誘われた。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "全力で参加", "risk": 1, "success_stat": "vitality", "success_threshold": 11, "success_effects": { "vitality": 2 }, "success_text": "体力が伸びた。", "fail_effects": { "vitality": -1 }, "fail_text": "疲労が残った。", "drop_chance": 0.1 },
+        { "text": "軽めに参加", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "vitality": 1 }, "success_text": "無理なく継続できた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "training_002",
+      "category": "training",
+      "title": "書庫修行",
+      "text": "書庫で集中して学ぶ時間を得た。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "難解な本に挑む", "risk": 1, "success_stat": "intelligence", "success_threshold": 12, "success_effects": { "intelligence": 2 }, "success_text": "理解が一段深まった。", "fail_effects": { "intelligence": -1 }, "fail_text": "頭が混乱した。", "drop_chance": 0.1 },
+        { "text": "基礎を復習", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "intelligence": 1 }, "success_text": "安定して身についた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "training_003",
+      "category": "training",
+      "title": "対話訓練",
+      "text": "交渉役として模擬対話に参加することになった。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "難しい役を受ける", "risk": 1, "success_stat": "charisma", "success_threshold": 11, "success_effects": { "charisma": 2 }, "success_text": "説得力が増した。", "fail_effects": { "charisma": -1 }, "fail_text": "言葉が詰まった。", "drop_chance": 0.1 },
+        { "text": "見学に回る", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "charisma": 1 }, "success_text": "要点を学べた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "training_004",
+      "category": "training",
+      "title": "危機対応訓練",
+      "text": "緊急時の判断訓練が始まった。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "先頭で指揮", "risk": 1, "success_stat": "luck", "success_threshold": 11, "success_effects": { "luck": 2, "charisma": 1 }, "success_text": "判断力が磨かれた。", "fail_effects": { "vitality": -1 }, "fail_text": "想定外で消耗した。", "drop_chance": 0.1 },
+        { "text": "補助役に徹する", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "luck": 1 }, "success_text": "堅実に経験を積んだ。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    },
+    {
+      "id": "training_005",
+      "category": "training",
+      "title": "商才講座",
+      "text": "経験者から資産運用の講義を受ける。",
+      "min_age": 13,
+      "max_age": 99,
+      "era": "any",
+      "choices": [
+        { "text": "実践課題をこなす", "risk": 1, "success_stat": "intelligence", "success_threshold": 10, "success_effects": { "intelligence": 1, "wealth": 2 }, "success_text": "収益感覚が鍛えられた。", "fail_effects": { "wealth": -1 }, "fail_text": "損失例を体験した。", "drop_chance": 0.1 },
+        { "text": "理論だけ学ぶ", "risk": 0, "success_stat": null, "success_threshold": 0, "success_effects": { "intelligence": 1 }, "success_text": "知識が増えた。", "fail_effects": {}, "fail_text": "", "drop_chance": 0.0 }
+      ]
+    }
+  ]
+}

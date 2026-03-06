@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cc4jm4g4h06wv"]
+
+[ext_resource type="Script" path="res://UI/InventoryPanelController.cs" id="1_o2b3w"]
+
+[node name="InventoryPanel" type="PanelContainer"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+script = ExtResource("1_o2b3w")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="TitleLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 72
+text = "インベントリ"
+
+[node name="SummaryLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 42
+autowrap_mode = 3
+text = "装備一覧"
+
+[node name="CloseButton" type="Button" parent="Margin/VBox"]
+custom_minimum_size = Vector2(860, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "閉じる"

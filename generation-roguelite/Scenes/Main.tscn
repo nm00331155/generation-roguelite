@@ -1,0 +1,567 @@
+[gd_scene load_steps=7 format=3 uid="uid://cagre2puqhik2"]
+
+[ext_resource type="Script" uid="uid://p4ae5tcfudd6" path="res://Scripts/Core/GameManager.cs" id="1_79r1x"]
+[ext_resource type="PackedScene" path="res://Scenes/UI/HUD.tscn" id="2_prompt_hud"]
+[ext_resource type="Script" path="res://UI/EventPanelController.cs" id="3_event_panel"]
+[ext_resource type="PackedScene" path="res://Scenes/UI/DebugOverlay.tscn" id="4_debug_overlay"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(1080, 200)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_navbubble"]
+bg_color = Color(0, 0, 0, 0.7)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_navicon"]
+bg_color = Color(0.63, 0.4, 0.92, 1)
+corner_radius_top_left = 72
+corner_radius_top_right = 72
+corner_radius_bottom_right = 72
+corner_radius_bottom_left = 72
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_79r1x")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="World"]
+
+[node name="SkyLayer" type="ParallaxLayer" parent="World/ParallaxBackground"]
+motion_scale = Vector2(0.25, 1)
+
+[node name="Background" type="Polygon2D" parent="World/ParallaxBackground/SkyLayer"]
+color = Color(0.09, 0.11, 0.17, 1)
+polygon = PackedVector2Array(0, 0, 1080, 0, 1080, 1920, 0, 1920)
+
+[node name="FarLayer" type="ParallaxLayer" parent="World/ParallaxBackground"]
+motion_scale = Vector2(0.55, 1)
+
+[node name="FarBand" type="Polygon2D" parent="World/ParallaxBackground/FarLayer"]
+color = Color(0.16, 0.21, 0.3, 1)
+polygon = PackedVector2Array(0, 540, 1080, 540, 1080, 1020, 0, 1020)
+
+[node name="NearLayer" type="ParallaxLayer" parent="World/ParallaxBackground"]
+motion_scale = Vector2(0.85, 1)
+
+[node name="GroundBand" type="Polygon2D" parent="World/ParallaxBackground/NearLayer"]
+color = Color(0.2, 0.28, 0.17, 1)
+polygon = PackedVector2Array(0, 1120, 1080, 1120, 1080, 1320, 0, 1320)
+
+[node name="Ground" type="StaticBody2D" parent="World"]
+position = Vector2(540, 1220)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="GroundVisual" type="ColorRect" parent="World/Ground"]
+offset_left = -540.0
+offset_top = -100.0
+offset_right = 540.0
+offset_bottom = 100.0
+color = Color(0.19, 0.3, 0.16, 1)
+
+[node name="Obstacles" type="Node2D" parent="World"]
+
+[node name="Collectibles" type="Node2D" parent="World"]
+
+[node name="Player" type="CharacterBody2D" parent="World"]
+position = Vector2(324, 1120)
+
+[node name="Camera2D" type="Camera2D" parent="World/Player"]
+enabled = false
+
+[node name="PlayerVisual" type="Polygon2D" parent="World/Player"]
+color = Color(0.22, 0.81, 0.92, 1)
+polygon = PackedVector2Array(-36, -72, 36, -72, 36, 0, -36, 0)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="PromptHUD" parent="UI" instance=ExtResource("2_prompt_hud")]
+visible = false
+
+[node name="HUD" type="PanelContainer" parent="UI"]
+offset_right = 1080.0
+offset_bottom = 240.0
+
+[node name="Margin" type="MarginContainer" parent="UI/HUD"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AgeLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "年齢"
+
+[node name="PhaseLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "フェーズ"
+
+[node name="LifeLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "寿命"
+
+[node name="LifeGauge" type="ProgressBar" parent="UI/HUD/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+
+[node name="GenerationLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "世代"
+
+[node name="StatsLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "能力値"
+
+[node name="ScoreLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "スコア"
+autowrap_mode = 3
+
+[node name="EventLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "イベント待機中..."
+autowrap_mode = 3
+
+[node name="NavigatorLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "ナビ: ..."
+autowrap_mode = 3
+
+[node name="HintLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "操作ヒント"
+
+[node name="MetaLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "メタ情報"
+autowrap_mode = 3
+
+[node name="CollectionLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "コレクション"
+autowrap_mode = 3
+
+[node name="LegendLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "家系の伝説"
+autowrap_mode = 3
+
+[node name="MonetizeLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "マネタイズ"
+autowrap_mode = 3
+
+[node name="OnlineLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "オンライン"
+autowrap_mode = 3
+
+[node name="PerfLabel" type="Label" parent="UI/HUD/Margin/VBox"]
+layout_mode = 2
+text = "パフォーマンス"
+autowrap_mode = 3
+
+[node name="EventPanel" type="PanelContainer" parent="UI"]
+visible = false
+offset_left = 54.0
+offset_top = 1400.0
+offset_right = 1026.0
+offset_bottom = 1860.0
+script = ExtResource("3_event_panel")
+
+[node name="Margin" type="MarginContainer" parent="UI/EventPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="VBox" type="VBoxContainer" parent="UI/EventPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="EventBodyLabel" type="Label" parent="UI/EventPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "イベント本文"
+autowrap_mode = 3
+
+[node name="ChoiceTapButton" type="Button" parent="UI/EventPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "選択肢A"
+
+[node name="ChoiceSwipeButton" type="Button" parent="UI/EventPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "選択肢B"
+
+[node name="ChoiceTimeoutButton" type="Button" parent="UI/EventPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "選択肢C"
+
+[node name="TimeBar" type="TextureProgressBar" parent="UI/EventPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+min_value = 0.0
+max_value = 8.0
+value = 8.0
+
+[node name="BottomStatsRow" type="HBoxContainer" parent="UI"]
+offset_left = 24.0
+offset_top = 1328.0
+offset_right = 1056.0
+offset_bottom = 1400.0
+theme_override_constants/separation = 14
+
+[node name="HpStat" type="Label" parent="UI/BottomStatsRow"]
+custom_minimum_size = Vector2(180, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 54
+text = "●体10"
+
+[node name="IntStat" type="Label" parent="UI/BottomStatsRow"]
+custom_minimum_size = Vector2(180, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 54
+text = "●知10"
+
+[node name="ChaStat" type="Label" parent="UI/BottomStatsRow"]
+custom_minimum_size = Vector2(180, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 54
+text = "●魅10"
+
+[node name="LuckStat" type="Label" parent="UI/BottomStatsRow"]
+custom_minimum_size = Vector2(180, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 54
+text = "●運10"
+
+[node name="WealthStat" type="Label" parent="UI/BottomStatsRow"]
+custom_minimum_size = Vector2(180, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 54
+text = "●財10"
+
+[node name="WalkingGuideLabel" type="Label" parent="UI"]
+offset_left = 54.0
+offset_top = 1728.0
+offset_right = 1026.0
+offset_bottom = 1778.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 42
+text = "歩いています…"
+
+[node name="BottomEquipSlots" type="HBoxContainer" parent="UI"]
+offset_left = 306.0
+offset_top = 1772.0
+offset_right = 774.0
+offset_bottom = 1916.0
+theme_override_constants/separation = 12
+
+[node name="Slot1" type="ColorRect" parent="UI/BottomEquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="UI/BottomEquipSlots/Slot1"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 43.0
+offset_right = 90.0
+offset_bottom = 101.0
+theme_override_font_sizes/font_size = 42
+text = "S"
+
+[node name="Slot2" type="ColorRect" parent="UI/BottomEquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="UI/BottomEquipSlots/Slot2"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 43.0
+offset_right = 90.0
+offset_bottom = 101.0
+theme_override_font_sizes/font_size = 42
+text = "D"
+
+[node name="Slot3" type="ColorRect" parent="UI/BottomEquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="UI/BottomEquipSlots/Slot3"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 43.0
+offset_right = 90.0
+offset_bottom = 101.0
+theme_override_font_sizes/font_size = 42
+text = "R"
+
+[node name="NavigatorArea" type="Control" parent="UI"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+
+[node name="Icon" type="PanelContainer" parent="UI/NavigatorArea"]
+offset_left = 36.0
+offset_top = 1140.0
+offset_right = 180.0
+offset_bottom = 1284.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_navicon")
+
+[node name="Bubble" type="PanelContainer" parent="UI/NavigatorArea"]
+offset_left = 196.0
+offset_top = 1000.0
+offset_right = 796.0
+offset_bottom = 1176.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_navbubble")
+
+[node name="Margin" type="MarginContainer" parent="UI/NavigatorArea/Bubble"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="BubbleLabel" type="Label" parent="UI/NavigatorArea/Bubble/Margin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 42
+text = "ナビ: ..."
+autowrap_mode = 3
+
+[node name="DebugOverlay" parent="UI" instance=ExtResource("4_debug_overlay")]
+
+[node name="PhaseBannerLabel" type="Label" parent="UI"]
+visible = false
+offset_left = 640.0
+offset_top = 20.0
+offset_right = 1050.0
+offset_bottom = 84.0
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "— フェーズ —"
+
+[node name="WillButton" type="Button" parent="UI"]
+visible = false
+offset_left = 900.0
+offset_top = 16.0
+offset_right = 1050.0
+offset_bottom = 68.0
+text = "遺言"
+
+[node name="WillPanel" type="PanelContainer" parent="UI"]
+visible = false
+offset_left = 640.0
+offset_top = 86.0
+offset_right = 1050.0
+offset_bottom = 460.0
+
+[node name="Margin" type="MarginContainer" parent="UI/WillPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="UI/WillPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="UI/WillPanel/Margin/VBox"]
+layout_mode = 2
+text = "遺言: 家宝指定"
+
+[node name="CandidateLabel" type="Label" parent="UI/WillPanel/Margin/VBox"]
+layout_mode = 2
+text = "候補"
+autowrap_mode = 3
+
+[node name="DetailLabel" type="Label" parent="UI/WillPanel/Margin/VBox"]
+layout_mode = 2
+text = "詳細"
+autowrap_mode = 3
+
+[node name="CandidateButtons" type="HBoxContainer" parent="UI/WillPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrevButton" type="Button" parent="UI/WillPanel/Margin/VBox/CandidateButtons"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+text = "前へ"
+
+[node name="NextButton" type="Button" parent="UI/WillPanel/Margin/VBox/CandidateButtons"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+text = "次へ"
+
+[node name="ApplyButton" type="Button" parent="UI/WillPanel/Margin/VBox"]
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+text = "この装備を家宝に指定"
+
+[node name="CloseButton" type="Button" parent="UI/WillPanel/Margin/VBox"]
+custom_minimum_size = Vector2(160, 48)
+layout_mode = 2
+text = "閉じる"
+
+[node name="DropFlash" type="ColorRect" parent="UI"]
+visible = false
+offset_right = 1080.0
+offset_bottom = 1920.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+
+[node name="FuneralOverlay" type="Control" parent="UI"]
+visible = false
+offset_right = 1080.0
+offset_bottom = 1920.0
+mouse_filter = 2
+
+[node name="FadeRect" type="ColorRect" parent="UI/FuneralOverlay"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0, 0, 0, 0)
+
+[node name="FuneralPanel" type="PanelContainer" parent="UI/FuneralOverlay"]
+visible = false
+offset_left = 80.0
+offset_top = 340.0
+offset_right = 1000.0
+offset_bottom = 1280.0
+
+[node name="Margin" type="MarginContainer" parent="UI/FuneralOverlay/FuneralPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="UI/FuneralOverlay/FuneralPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SummaryLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "故人情報"
+autowrap_mode = 3
+
+[node name="DeathCauseLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "死因"
+
+[node name="SnapshotLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "ハイライト"
+autowrap_mode = 3
+
+[node name="TombstoneLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "  †\n████\n████"
+
+[node name="GenerationScoreLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "世代スコア"
+
+[node name="InterstitialLabel" type="Label" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+layout_mode = 2
+text = "広告表示状況"
+autowrap_mode = 3
+
+[node name="NextGenerationButton" type="Button" parent="UI/FuneralOverlay/FuneralPanel/Margin/VBox"]
+visible = false
+custom_minimum_size = Vector2(220, 56)
+layout_mode = 2
+text = "次の世代へ"
+
+[node name="NextGenerationPanel" type="PanelContainer" parent="UI/FuneralOverlay"]
+visible = false
+offset_left = 80.0
+offset_top = 360.0
+offset_right = 1000.0
+offset_bottom = 1540.0
+
+[node name="Margin" type="MarginContainer" parent="UI/FuneralOverlay/NextGenerationPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="UI/FuneralOverlay/NextGenerationPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="InheritanceLabel" type="Label" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+text = "遺産"
+
+[node name="ChildTypeLabel" type="Label" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+text = "子の種類"
+
+[node name="ChildPreviewLabel" type="Label" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+text = "初期能力値"
+autowrap_mode = 3
+
+[node name="UniqueSkillLabel" type="Label" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+text = "ユニークスキル"
+autowrap_mode = 3
+
+[node name="TypeButtons" type="HBoxContainer" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BiologicalButton" type="Button" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox/TypeButtons"]
+custom_minimum_size = Vector2(180, 52)
+layout_mode = 2
+text = "実子"
+
+[node name="AdoptedButton" type="Button" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox/TypeButtons"]
+custom_minimum_size = Vector2(180, 52)
+layout_mode = 2
+text = "養子"
+
+[node name="ActionButtons" type="HBoxContainer" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BirthButton" type="Button" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox/ActionButtons"]
+custom_minimum_size = Vector2(220, 56)
+layout_mode = 2
+text = "誕生"
+
+[node name="BirthAdBonusButton" type="Button" parent="UI/FuneralOverlay/NextGenerationPanel/Margin/VBox/ActionButtons"]
+custom_minimum_size = Vector2(280, 56)
+layout_mode = 2
+text = "広告を見て遺産ボーナス"
+
+[node name="VoicePlayer" type="AudioStreamPlayer" parent="UI"]

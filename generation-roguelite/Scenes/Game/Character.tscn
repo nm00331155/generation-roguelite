@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://dnmef8k0r6gpa"]
+
+[ext_resource type="Script" path="res://Scripts/Character/PlayerCharacter.cs" id="1_4h4ef"]
+
+[node name="Character" type="CharacterBody2D"]
+script = ExtResource("1_4h4ef")
+
+[node name="Visual" type="ColorRect" parent="."]
+anchors_preset = 0
+offset_left = -36.0
+offset_top = -72.0
+offset_right = 36.0
+offset_bottom = 0.0
+color = Color(0.2, 0.55, 0.95, 1)

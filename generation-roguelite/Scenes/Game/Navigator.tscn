@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://b4vqnjhn2lvjq"]
+
+[node name="Navigator" type="Node2D"]
+
+[node name="Icon" type="ColorRect" parent="."]
+anchors_preset = 0
+offset_left = -24.0
+offset_top = -24.0
+offset_right = 24.0
+offset_bottom = 24.0
+color = Color(0.63, 0.4, 0.92, 1)

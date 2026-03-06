@@ -1,0 +1,345 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://UI/HUDController.cs" id="1_hud"]
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hud")
+
+[node name="TopBar" type="PanelContainer" parent="."]
+offset_right = 1080.0
+offset_bottom = 240.0
+modulate = Color(1, 1, 1, 0.86)
+
+[node name="TopRow" type="HBoxContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="LeftGroup" type="HBoxContainer" parent="TopBar/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="NameAgeLabel" type="Label" parent="TopBar/TopRow/LeftGroup"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "名前 Age:23"
+
+[node name="PhaseLabel" type="Label" parent="TopBar/TopRow/LeftGroup"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "●青年期"
+
+[node name="RightGroup" type="HBoxContainer" parent="TopBar/TopRow"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="GenerationLabel" type="Label" parent="TopBar/TopRow/RightGroup"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "Gen:5"
+
+[node name="ScoreLabel" type="Label" parent="TopBar/TopRow/RightGroup"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "Score:12,450"
+
+[node name="SettingsButton" type="Button" parent="TopBar/TopRow/RightGroup"]
+custom_minimum_size = Vector2(192, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "⚙"
+
+[node name="StatDock" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 8.0
+offset_top = -170.0
+offset_right = 220.0
+offset_bottom = 170.0
+grow_vertical = 2
+
+[node name="CollapsedDots" type="VBoxContainer" parent="StatDock"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -28.0
+offset_top = -42.0
+offset_right = -8.0
+offset_bottom = 42.0
+grow_horizontal = 0
+theme_override_constants/separation = 8
+
+[node name="VitalityDot" type="ColorRect" parent="StatDock/CollapsedDots"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+color = Color(1, 0.26, 0.26, 1)
+
+[node name="IntelligenceDot" type="ColorRect" parent="StatDock/CollapsedDots"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+color = Color(0.3, 0.56, 1, 1)
+
+[node name="CharismaDot" type="ColorRect" parent="StatDock/CollapsedDots"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+color = Color(1, 0.46, 0.84, 1)
+
+[node name="LuckDot" type="ColorRect" parent="StatDock/CollapsedDots"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+color = Color(0.98, 0.92, 0.34, 1)
+
+[node name="WealthDot" type="ColorRect" parent="StatDock/CollapsedDots"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+color = Color(1, 0.77, 0.2, 1)
+
+[node name="ExpandedPanel" type="PanelContainer" parent="StatDock"]
+visible = false
+offset_right = 200.0
+offset_bottom = 300.0
+
+[node name="Margin" type="MarginContainer" parent="StatDock/ExpandedPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="StatDock/ExpandedPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="VitalityRow" type="HBoxContainer" parent="StatDock/ExpandedPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/VitalityRow"]
+layout_mode = 2
+text = "体力"
+
+[node name="Value" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/VitalityRow"]
+layout_mode = 2
+text = "10"
+
+[node name="Bar" type="ProgressBar" parent="StatDock/ExpandedPanel/Margin/VBox/VitalityRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+
+[node name="IntelligenceRow" type="HBoxContainer" parent="StatDock/ExpandedPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/IntelligenceRow"]
+layout_mode = 2
+text = "知力"
+
+[node name="Value" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/IntelligenceRow"]
+layout_mode = 2
+text = "10"
+
+[node name="Bar" type="ProgressBar" parent="StatDock/ExpandedPanel/Margin/VBox/IntelligenceRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+
+[node name="CharismaRow" type="HBoxContainer" parent="StatDock/ExpandedPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/CharismaRow"]
+layout_mode = 2
+text = "魅力"
+
+[node name="Value" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/CharismaRow"]
+layout_mode = 2
+text = "10"
+
+[node name="Bar" type="ProgressBar" parent="StatDock/ExpandedPanel/Margin/VBox/CharismaRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+
+[node name="LuckRow" type="HBoxContainer" parent="StatDock/ExpandedPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/LuckRow"]
+layout_mode = 2
+text = "運"
+
+[node name="Value" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/LuckRow"]
+layout_mode = 2
+text = "10"
+
+[node name="Bar" type="ProgressBar" parent="StatDock/ExpandedPanel/Margin/VBox/LuckRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+
+[node name="WealthRow" type="HBoxContainer" parent="StatDock/ExpandedPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/WealthRow"]
+layout_mode = 2
+text = "財力"
+
+[node name="Value" type="Label" parent="StatDock/ExpandedPanel/Margin/VBox/WealthRow"]
+layout_mode = 2
+text = "10"
+
+[node name="Bar" type="ProgressBar" parent="StatDock/ExpandedPanel/Margin/VBox/WealthRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+
+[node name="LifespanDock" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 27.0
+offset_top = 186.0
+offset_right = -27.0
+offset_bottom = 222.0
+
+[node name="LifespanBar" type="ProgressBar" parent="LifespanDock"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+max_value = 100.0
+value = 100.0
+
+[node name="Warning" type="Label" parent="LifespanDock"]
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -28.0
+offset_top = -48.0
+offset_right = 28.0
+offset_bottom = -8.0
+grow_horizontal = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 42
+text = "▲"
+
+[node name="Bottom" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -124.0
+grow_vertical = 0
+
+[node name="Navigator" type="Control" parent="Bottom"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = -12.0
+offset_right = 812.0
+offset_bottom = 176.0
+
+[node name="Icon" type="ColorRect" parent="Bottom/Navigator"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 0
+offset_left = 4.0
+offset_top = 20.0
+offset_right = 148.0
+offset_bottom = 164.0
+color = Color(0.64, 0.39, 0.9, 1)
+
+[node name="Bubble" type="PanelContainer" parent="Bottom/Navigator"]
+layout_mode = 0
+offset_left = 168.0
+offset_top = -8.0
+offset_right = 768.0
+offset_bottom = 164.0
+
+[node name="Margin" type="MarginContainer" parent="Bottom/Navigator/Bubble"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="Label" type="Label" parent="Bottom/Navigator/Bubble/Margin"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "ナビメッセージ"
+autowrap_mode = 3
+
+[node name="EquipSlots" type="HBoxContainer" parent="Bottom"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -474.0
+offset_top = 20.0
+offset_right = -6.0
+offset_bottom = 164.0
+grow_horizontal = 0
+theme_override_constants/separation = 8
+
+[node name="Slot1" type="ColorRect" parent="Bottom/EquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="Bottom/EquipSlots/Slot1"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 44.0
+offset_right = 90.0
+offset_bottom = 102.0
+theme_override_font_sizes/font_size = 42
+text = "S"
+
+[node name="Slot2" type="ColorRect" parent="Bottom/EquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="Bottom/EquipSlots/Slot2"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 44.0
+offset_right = 90.0
+offset_bottom = 102.0
+theme_override_font_sizes/font_size = 42
+text = "D"
+
+[node name="Slot3" type="ColorRect" parent="Bottom/EquipSlots"]
+custom_minimum_size = Vector2(144, 144)
+layout_mode = 2
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Label" type="Label" parent="Bottom/EquipSlots/Slot3"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 44.0
+offset_right = 90.0
+offset_bottom = 102.0
+theme_override_font_sizes/font_size = 42
+text = "R"

@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://b7xgni4f4x7q4"]
+
+[ext_resource type="Script" path="res://UI/GenerationScreenController.cs" id="1_q7ay8"]
+
+[node name="GenerationScreen" type="PanelContainer"]
+offset_left = 54.0
+offset_top = 300.0
+offset_right = 1026.0
+offset_bottom = 1740.0
+script = ExtResource("1_q7ay8")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="TitleLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 72
+text = "次の世代"
+
+[node name="SummaryLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 42
+autowrap_mode = 3
+text = "世代交代サマリー"
+
+[node name="ConfirmButton" type="Button" parent="Margin/VBox"]
+custom_minimum_size = Vector2(860, 144)
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "世代を開始"

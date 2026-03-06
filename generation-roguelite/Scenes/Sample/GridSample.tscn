@@ -1,0 +1,263 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Sample/GridSampleManager.cs" id="1_gridsample"]
+
+[node name="GridSample" type="Node2D"]
+script = ExtResource("1_gridsample")
+
+[node name="Background" type="Node2D" parent="."]
+z_index = -10
+
+[node name="SkyBg" type="TextureRect" parent="Background"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1080.0
+offset_bottom = 1920.0
+expand_mode = 1
+stretch_mode = 0
+
+[node name="MidGround" type="TextureRect" parent="Background"]
+offset_left = 0.0
+offset_top = 1400.0
+offset_right = 1080.0
+offset_bottom = 1920.0
+expand_mode = 1
+stretch_mode = 0
+
+[node name="GridContainer" type="Node2D" parent="."]
+
+[node name="Cell_0_0" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 100.0
+offset_top = 450.0
+offset_right = 380.0
+offset_bottom = 730.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_1_0" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 400.0
+offset_top = 450.0
+offset_right = 680.0
+offset_bottom = 730.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_2_0" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 700.0
+offset_top = 450.0
+offset_right = 980.0
+offset_bottom = 730.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_0_1" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 100.0
+offset_top = 750.0
+offset_right = 380.0
+offset_bottom = 1030.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_1_1" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 400.0
+offset_top = 750.0
+offset_right = 680.0
+offset_bottom = 1030.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_2_1" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 700.0
+offset_top = 750.0
+offset_right = 980.0
+offset_bottom = 1030.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_0_2" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 100.0
+offset_top = 1050.0
+offset_right = 380.0
+offset_bottom = 1330.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_1_2" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 400.0
+offset_top = 1050.0
+offset_right = 680.0
+offset_bottom = 1330.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Cell_2_2" type="ColorRect" parent="GridContainer"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 700.0
+offset_top = 1050.0
+offset_right = 980.0
+offset_bottom = 1330.0
+color = Color(0.4, 0.4, 0.5, 0.3)
+
+[node name="Player" type="AnimatedSprite2D" parent="."]
+position = Vector2(540, 890)
+scale = Vector2(0.59, 0.59)
+
+[node name="Obstacles" type="Node2D" parent="."]
+
+[node name="WarningLines" type="Node2D" parent="."]
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="OperationArea" type="ColorRect" parent="."]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_top = 1390.0
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0.2, 0.2, 0.28, 1)
+
+[node name="Boundary" type="ColorRect" parent="OperationArea"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_top = -50.0
+offset_right = 1080.0
+offset_bottom = 0.0
+color = Color(0.1, 0.1, 0.15, 0.3)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HUD" type="VBoxContainer" parent="UI"]
+offset_left = 24.0
+offset_top = 12.0
+offset_right = 1056.0
+offset_bottom = 220.0
+theme_override_constants/separation = 8
+
+[node name="PhaseLabel" type="Label" parent="UI/HUD"]
+text = "青年期"
+
+[node name="AgeLabel" type="Label" parent="UI/HUD"]
+text = "20歳"
+
+[node name="WaveLabel" type="Label" parent="UI/HUD"]
+horizontal_alignment = 2
+text = "Wave 1/3"
+
+[node name="LifeBar" type="ProgressBar" parent="UI/HUD"]
+custom_minimum_size = Vector2(400, 30)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="ComboLabel" type="Label" parent="UI/HUD"]
+horizontal_alignment = 2
+text = "Combo: 0"
+
+[node name="ScoreLabel" type="Label" parent="UI/HUD"]
+horizontal_alignment = 2
+text = "Score: 0"
+
+[node name="NavigatorArea" type="HBoxContainer" parent="UI"]
+offset_left = 40.0
+offset_top = 186.0
+offset_right = 1040.0
+offset_bottom = 420.0
+theme_override_constants/separation = 16
+
+[node name="NaviIcon" type="TextureRect" parent="UI/NavigatorArea"]
+custom_minimum_size = Vector2(80, 80)
+
+[node name="NaviBubble" type="TextureRect" parent="UI/NavigatorArea"]
+custom_minimum_size = Vector2(860, 180)
+stretch_mode = 6
+
+[node name="NavigatorLabel" type="Label" parent="UI/NavigatorArea/NaviBubble"]
+offset_left = 40.0
+offset_top = 32.0
+offset_right = 810.0
+offset_bottom = 148.0
+text = "画面の下をスワイプして動こう！"
+
+[node name="StateLabel" type="Label" parent="UI"]
+offset_left = 170.0
+offset_top = 360.0
+offset_right = 910.0
+offset_bottom = 430.0
+horizontal_alignment = 1
+text = "Tap or press any key to start"
+
+[node name="EventPanel" type="PanelContainer" parent="UI"]
+visible = false
+offset_left = 80.0
+offset_top = 1410.0
+offset_right = 1000.0
+offset_bottom = 1860.0
+
+[node name="EventVBox" type="VBoxContainer" parent="UI/EventPanel"]
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 880.0
+offset_bottom = 410.0
+theme_override_constants/separation = 20
+
+[node name="EventText" type="Label" parent="UI/EventPanel/EventVBox"]
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 120)
+horizontal_alignment = 1
+text = "道端で困っている人を見かけた"
+autowrap_mode = 2
+
+[node name="EventSpacer" type="Control" parent="UI/EventPanel/EventVBox"]
+custom_minimum_size = Vector2(0, 20)
+
+[node name="ButtonBox" type="HBoxContainer" parent="UI/EventPanel/EventVBox"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+
+[node name="ChoiceA" type="Button" parent="UI/EventPanel/EventVBox/ButtonBox"]
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 80)
+text = "助ける"
+
+[node name="ChoiceB" type="Button" parent="UI/EventPanel/EventVBox/ButtonBox"]
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 80)
+text = "通り過ぎる"
+
+[node name="FlashOverlay" type="ColorRect" parent="UI"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(1, 1, 1, 0)
+mouse_filter = 2
+
+[node name="HitFlashOverlay" type="ColorRect" parent="UI"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(1, 0, 0, 0)
+mouse_filter = 2
+
+[node name="DeathOverlay" type="ColorRect" parent="UI"]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0, 0, 0, 0)
+mouse_filter = 2

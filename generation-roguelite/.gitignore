@@ -1,0 +1,28 @@
+cd D:\code_workspace\generation-roguelite\generation-roguelite
+
+@"
+# Godot
+.godot/
+*.import
+
+# Android build
+android/build/
+android/.gradle/
+.gradle-export/
+
+# APK / build output
+exports/
+build/
+*.apk
+*.aab
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+"@ | Set-Content -Path .gitignore -Encoding UTF8
