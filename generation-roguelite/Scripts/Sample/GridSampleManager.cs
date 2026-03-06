@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace GenerationRoguelite.Sample;
 
@@ -23,8 +24,11 @@ public partial class GridSampleManager : Node2D
 
     // ──────────── バランス定数 ────────────
     private const float BaseLife = 100f;
-    private const float HitDamage = 10f;
-    private const float GuardDamage = 2f;
+    private const float HitDamage = 30f;
+    private const float GuardDamage = 15f;
+
+    private const float EventTimeLimit = 3f;
+    private const string HighScorePath = "user://highscore.json";
 
     private const int ZoneComboThreshold = 8;
     private const float ZoneDuration = 3f;
@@ -33,7 +37,6 @@ public partial class GridSampleManager : Node2D
 
     // ──────────── ガードフレーム制御 ────────────
     private const int GuardHoldFrame = 5;   // 0-indexed: 長押し中ここで停止
-    private const float GuardReleaseFps = 10f; // 離した後の残りフレーム再生速度
 
     // ──────────── 色定数 ────────────
     private static readonly Color CellBorderDefaultColor = new(0.35f, 0.35f, 0.45f, 0.25f);
@@ -194,7 +197,6 @@ public partial class GridSampleManager : Node2D
 
     private bool _isMoving;
     private bool _isGuarding;
-    private bool _guardReleasing; // ガード解除アニメーション再生中
 
     private bool _spaceHolding;
     private bool _touchHolding;
@@ -232,6 +234,7 @@ public partial class GridSampleManager : Node2D
 
     private Tween? _speechTween;
     private Tween? _shakeTween;
+    private Tween? _activeTween;
 
     private Node2D? _swipeHint;
     private Tween? _swipeHintPulseTween;
@@ -244,6 +247,12 @@ public partial class GridSampleManager : Node2D
     private SimpleEvent? _activeEvent;
     private int _pendingWaveIndex = -1;
     private bool _eventLocked;
+    private float _eventTimer;
+    private Label? _eventTimerLabel;
+
+    private int _highScore;
+    private int _highWave;
+    private readonly List<Label> _deathSummaryLabels = new();
 
     private StyleBoxFlat _lifeBackgroundStyle = null!;
     private StyleBoxFlat _lifeFillStyle = null!;
@@ -266,6 +275,7 @@ public partial class GridSampleManager : Node2D
 
         BuildWaveDefs();
         BuildEvents();
+        LoadHighScore();
 
         ResetToIdleState(showIntroMessage: true);
     }
@@ -275,16 +285,12 @@ public partial class GridSampleManager : Node2D
         float dt = (float)delta;
         _gameTime += dt;
 
-        // 背景微速スクロール（走ってる感）
-        if (_state == GameState.Playing)
+        // 背景微速スクロール（常時）
+        _bgScrollOffset += dt * 30f;
+        if (_midGround != null)
         {
-            _bgScrollOffset += dt * 30f;
-            if (_midGround != null)
-            {
-                // midgroundを左にスクロールさせるシンプル実装
-                float offsetX = -(_bgScrollOffset % 1080f);
-                _midGround.Position = new Vector2(offsetX, _midGround.Position.Y);
-            }
+            float offsetX = -(_bgScrollOffset % 1080f);
+            _midGround.Position = new Vector2(offsetX, _midGround.Position.Y);
         }
 
         if (_state == GameState.Playing)
@@ -301,6 +307,7 @@ public partial class GridSampleManager : Node2D
         {
             _waveElapsed += dt;
             TickObstacles(dt);
+            TickEventTimer(dt);
         }
 
         TickGuardHold(dt);
@@ -376,6 +383,23 @@ public partial class GridSampleManager : Node2D
         _choiceB = _eventPanel.GetNodeOrNull<Button>("EventVBox/ButtonBox/ChoiceB")
                    ?? _eventPanel.GetNode<Button>("ChoiceB");
 
+        _eventTimerLabel = _eventPanel.GetNodeOrNull<Label>("EventVBox/EventTimer")
+                          ?? _eventPanel.GetNodeOrNull<Label>("EventTimer");
+        if (_eventTimerLabel == null)
+        {
+            _eventTimerLabel = new Label
+            {
+                Name = "EventTimer",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visible = false,
+            };
+
+            Control timerParent = _eventPanel.GetNodeOrNull<Control>("EventVBox") ?? _eventPanel;
+            timerParent.AddChild(_eventTimerLabel);
+        }
+        _eventTimerLabel.Visible = false;
+
         _choiceA.Pressed += () => OnEventOptionSelected(chooseA: true);
         _choiceB.Pressed += () => OnEventOptionSelected(chooseA: false);
 
@@ -439,13 +463,14 @@ public partial class GridSampleManager : Node2D
     private void BuildPlayerFrames()
     {
         SpriteFrames frames = new();
+        Texture2D moveSheet = GD.Load<Texture2D>("res://Assets/Sprites/female_move.png");
 
         // FPSを全体的に下げてゆったり感を出す
         RegisterAnimation(frames, "idle", GD.Load<Texture2D>("res://Assets/Sprites/female_idle.png"), 5f, true);
         RegisterAnimation(frames, "run", GD.Load<Texture2D>("res://Assets/Sprites/female_run.png"), 6f, true);
-        RegisterAnimation(frames, "move", GD.Load<Texture2D>("res://Assets/Sprites/female_move.png"), 12f, false);
-        RegisterAnimation(frames, "guard", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), 10f, false); // loop=false!
-        RegisterAnimation(frames, "guard_release", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), GuardReleaseFps, false); // フレーム6-8用
+        RegisterPartialAnimation(frames, "move_forward", moveSheet, 8f, false, new[] { 0, 1, 2, 3, 4, 5 });
+        RegisterPartialAnimation(frames, "move_back", moveSheet, 8f, false, new[] { 0, 1, 6, 7, 8 });
+        RegisterAnimation(frames, "guard", GD.Load<Texture2D>("res://Assets/Sprites/female_guard.png"), 6f, false); // loop=false!
         RegisterAnimation(frames, "hurt", GD.Load<Texture2D>("res://Assets/Sprites/female_hurt.png"), 6f, false);
         RegisterAnimation(frames, "death", GD.Load<Texture2D>("res://Assets/Sprites/female_death.png"), 5f, false);
 
@@ -463,30 +488,37 @@ public partial class GridSampleManager : Node2D
         frames.SetAnimationSpeed(animationName, fps);
         frames.SetAnimationLoop(animationName, loop);
 
-        if (animationName == "guard_release")
+        for (int i = 0; i < 9; i++)
         {
-            // フレーム6,7,8のみ登録
-            for (int i = 6; i < 9; i++)
-            {
-                int col = i % 3;
-                int row = i / 3;
-                AtlasTexture atlas = new();
-                atlas.Atlas = sheet;
-                atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
-                frames.AddFrame(animationName, atlas);
-            }
+            int col = i % 3;
+            int row = i / 3;
+            AtlasTexture atlas = new();
+            atlas.Atlas = sheet;
+            atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
+            frames.AddFrame(animationName, atlas);
         }
-        else
+    }
+
+    private static void RegisterPartialAnimation(SpriteFrames frames, string animationName, Texture2D? sheet, float fps, bool loop, int[] frameIndices)
+    {
+        if (sheet == null)
         {
-            for (int i = 0; i < 9; i++)
-            {
-                int col = i % 3;
-                int row = i / 3;
-                AtlasTexture atlas = new();
-                atlas.Atlas = sheet;
-                atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
-                frames.AddFrame(animationName, atlas);
-            }
+            throw new InvalidOperationException($"Texture missing for animation '{animationName}'.");
+        }
+
+        frames.AddAnimation(animationName);
+        frames.SetAnimationSpeed(animationName, fps);
+        frames.SetAnimationLoop(animationName, loop);
+
+        foreach (int frameIndex in frameIndices)
+        {
+            int col = frameIndex % 3;
+            int row = frameIndex / 3;
+
+            AtlasTexture atlas = new();
+            atlas.Atlas = sheet;
+            atlas.Region = new Rect2(col * 341, row * 341, 341, 341);
+            frames.AddFrame(animationName, atlas);
         }
     }
 
@@ -530,7 +562,7 @@ public partial class GridSampleManager : Node2D
         _skyBg.OffsetLeft = 0f;
         _skyBg.OffsetTop = 0f;
         _skyBg.OffsetRight = 1080f;
-        _skyBg.OffsetBottom = 1000f;
+        _skyBg.OffsetBottom = 960f;
 
         // 中景: グリッド背後に配置（街並みや森）
         _midGround.Texture = _texMidGround;
@@ -546,7 +578,7 @@ public partial class GridSampleManager : Node2D
         _groundLayer.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
         _groundLayer.StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered;
         _groundLayer.OffsetLeft = 0f;
-        _groundLayer.OffsetTop = 1000f;
+        _groundLayer.OffsetTop = 1050f;
         _groundLayer.OffsetRight = 1080f;
         _groundLayer.OffsetBottom = 1420f;
 
@@ -641,6 +673,7 @@ public partial class GridSampleManager : Node2D
         _eventText.AddThemeFontSizeOverride("font_size", 28);
         _choiceA.AddThemeFontSizeOverride("font_size", 30);
         _choiceB.AddThemeFontSizeOverride("font_size", 30);
+        _eventTimerLabel?.AddThemeFontSizeOverride("font_size", 26);
         _stateLabel.AddThemeFontSizeOverride("font_size", 36);
 
         _phaseLabel.AddThemeColorOverride("font_color", Colors.White);
@@ -650,6 +683,9 @@ public partial class GridSampleManager : Node2D
         _scoreLabel.AddThemeColorOverride("font_color", Colors.White);
         _navigatorLabel.AddThemeColorOverride("font_color", Colors.White);
         _eventText.AddThemeColorOverride("font_color", Colors.White);
+        _eventTimerLabel?.AddThemeColorOverride("font_color", new Color(1f, 0.95f, 0.6f, 1f));
+        _eventTimerLabel?.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.8f));
+        _eventTimerLabel?.AddThemeConstantOverride("outline_size", 3);
         _stateLabel.AddThemeColorOverride("font_color", Colors.White);
 
         _navigatorLabel.AutowrapMode = TextServer.AutowrapMode.Word;
@@ -668,43 +704,169 @@ public partial class GridSampleManager : Node2D
         button.AddThemeColorOverride("font_focus_color", Colors.White);
     }
 
-    // ──────────── Wave定義（SpeedPerCell拡大=ゆっくり） ────────────
+    // ──────────── Wave定義（10Wave化） ────────────
     private void BuildWaveDefs()
     {
+        static ObstacleEntry Entry(ObstacleDirection direction, int lane, float spawnTime, float speedPerCell, int orderNumber)
+        {
+            return new ObstacleEntry
+            {
+                Direction = direction,
+                Lane = lane,
+                SpawnTime = spawnTime,
+                SpeedPerCell = speedPerCell,
+                OrderNumber = orderNumber,
+            };
+        }
+
         _waves = new[]
         {
+            // Wave 1-2: 右のみ（3-4体, Speed 0.5）
             new WaveDef
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.5f, SpeedPerCell = 0.6f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 5.0f, SpeedPerCell = 0.6f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 7.5f, SpeedPerCell = 0.6f, OrderNumber = 3 },
+                    Entry(ObstacleDirection.Right, 0, 1.8f, 0.5f, 1),
+                    Entry(ObstacleDirection.Right, 1, 3.4f, 0.5f, 2),
+                    Entry(ObstacleDirection.Right, 2, 5.0f, 0.5f, 3),
                 },
             },
             new WaveDef
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 2.5f, SpeedPerCell = 0.5f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 4.5f, SpeedPerCell = 0.5f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 6.5f, SpeedPerCell = 0.5f, OrderNumber = 3 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 8.5f, SpeedPerCell = 0.5f, OrderNumber = 4 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 10.0f, SpeedPerCell = 0.5f, OrderNumber = 5 },
+                    Entry(ObstacleDirection.Right, 1, 1.6f, 0.5f, 1),
+                    Entry(ObstacleDirection.Right, 0, 2.9f, 0.5f, 2),
+                    Entry(ObstacleDirection.Right, 2, 4.2f, 0.5f, 3),
+                    Entry(ObstacleDirection.Right, 1, 5.5f, 0.5f, 4),
+                },
+            },
+
+            // Wave 3-4: 右+上（5-6体, Speed 0.4）
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Right, 0, 1.5f, 0.4f, 1),
+                    Entry(ObstacleDirection.Top, 1, 2.4f, 0.4f, 2),
+                    Entry(ObstacleDirection.Right, 2, 3.3f, 0.4f, 3),
+                    Entry(ObstacleDirection.Top, 0, 4.3f, 0.4f, 4),
+                    Entry(ObstacleDirection.Right, 1, 5.3f, 0.4f, 5),
                 },
             },
             new WaveDef
             {
                 Obstacles = new[]
                 {
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 2.5f, SpeedPerCell = 0.5f, OrderNumber = 1 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 2, SpawnTime = 3.5f, SpeedPerCell = 0.5f, OrderNumber = 2 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 1, SpawnTime = 5.5f, SpeedPerCell = 0.4f, OrderNumber = 3 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 7.0f, SpeedPerCell = 0.55f, OrderNumber = 4 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 0, SpawnTime = 8.5f, SpeedPerCell = 0.35f, OrderNumber = 5 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 0, SpawnTime = 10.0f, SpeedPerCell = 0.45f, OrderNumber = 6 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Top, Lane = 2, SpawnTime = 11.0f, SpeedPerCell = 0.45f, OrderNumber = 7 },
-                    new ObstacleEntry { Direction = ObstacleDirection.Right, Lane = 1, SpawnTime = 12.5f, SpeedPerCell = 0.35f, OrderNumber = 8 },
+                    Entry(ObstacleDirection.Top, 2, 1.4f, 0.4f, 1),
+                    Entry(ObstacleDirection.Right, 1, 2.2f, 0.4f, 2),
+                    Entry(ObstacleDirection.Top, 0, 3.0f, 0.4f, 3),
+                    Entry(ObstacleDirection.Right, 2, 3.8f, 0.4f, 4),
+                    Entry(ObstacleDirection.Top, 1, 4.6f, 0.4f, 5),
+                    Entry(ObstacleDirection.Right, 0, 5.4f, 0.4f, 6),
+                },
+            },
+
+            // Wave 5-6: 右+上+左（7-8体, Speed 0.35）
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Right, 0, 1.2f, 0.35f, 1),
+                    Entry(ObstacleDirection.Top, 2, 1.9f, 0.35f, 2),
+                    Entry(ObstacleDirection.Left, 1, 2.7f, 0.35f, 3),
+                    Entry(ObstacleDirection.Right, 2, 3.4f, 0.35f, 4),
+                    Entry(ObstacleDirection.Top, 0, 4.1f, 0.35f, 5),
+                    Entry(ObstacleDirection.Left, 2, 4.8f, 0.35f, 6),
+                    Entry(ObstacleDirection.Right, 1, 5.5f, 0.35f, 7),
+                },
+            },
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Top, 1, 1.1f, 0.35f, 1),
+                    Entry(ObstacleDirection.Left, 0, 1.8f, 0.35f, 2),
+                    Entry(ObstacleDirection.Right, 2, 2.5f, 0.35f, 3),
+                    Entry(ObstacleDirection.Top, 0, 3.2f, 0.35f, 4),
+                    Entry(ObstacleDirection.Left, 1, 3.9f, 0.35f, 5),
+                    Entry(ObstacleDirection.Right, 0, 4.6f, 0.35f, 6),
+                    Entry(ObstacleDirection.Top, 2, 5.3f, 0.35f, 7),
+                    Entry(ObstacleDirection.Left, 2, 6.0f, 0.35f, 8),
+                },
+            },
+
+            // Wave 7-8: 全4方向（9-10体, Speed 0.3）
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Right, 0, 1.0f, 0.3f, 1),
+                    Entry(ObstacleDirection.Top, 2, 1.6f, 0.3f, 2),
+                    Entry(ObstacleDirection.Left, 1, 2.2f, 0.3f, 3),
+                    Entry(ObstacleDirection.Down, 0, 2.8f, 0.3f, 4),
+                    Entry(ObstacleDirection.Right, 2, 3.4f, 0.3f, 5),
+                    Entry(ObstacleDirection.Top, 1, 4.0f, 0.3f, 6),
+                    Entry(ObstacleDirection.Left, 0, 4.6f, 0.3f, 7),
+                    Entry(ObstacleDirection.Down, 2, 5.2f, 0.3f, 8),
+                    Entry(ObstacleDirection.Right, 1, 5.8f, 0.3f, 9),
+                },
+            },
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Down, 1, 0.9f, 0.3f, 1),
+                    Entry(ObstacleDirection.Right, 0, 1.4f, 0.3f, 2),
+                    Entry(ObstacleDirection.Top, 2, 2.0f, 0.3f, 3),
+                    Entry(ObstacleDirection.Left, 1, 2.5f, 0.3f, 4),
+                    Entry(ObstacleDirection.Down, 0, 3.0f, 0.3f, 5),
+                    Entry(ObstacleDirection.Right, 2, 3.5f, 0.3f, 6),
+                    Entry(ObstacleDirection.Top, 0, 4.0f, 0.3f, 7),
+                    Entry(ObstacleDirection.Left, 2, 4.5f, 0.3f, 8),
+                    Entry(ObstacleDirection.Down, 2, 5.0f, 0.3f, 9),
+                    Entry(ObstacleDirection.Right, 1, 5.5f, 0.3f, 10),
+                },
+            },
+
+            // Wave 9-10: 全方向（12-15体, Speed 0.25, 同時出現あり）
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Right, 0, 0.8f, 0.25f, 1),
+                    Entry(ObstacleDirection.Top, 2, 0.8f, 0.25f, 2),
+                    Entry(ObstacleDirection.Left, 1, 1.5f, 0.25f, 3),
+                    Entry(ObstacleDirection.Down, 0, 1.5f, 0.25f, 4),
+                    Entry(ObstacleDirection.Right, 2, 2.2f, 0.25f, 5),
+                    Entry(ObstacleDirection.Top, 1, 2.2f, 0.25f, 6),
+                    Entry(ObstacleDirection.Left, 0, 2.9f, 0.25f, 7),
+                    Entry(ObstacleDirection.Down, 2, 2.9f, 0.25f, 8),
+                    Entry(ObstacleDirection.Right, 1, 3.6f, 0.25f, 9),
+                    Entry(ObstacleDirection.Top, 0, 3.6f, 0.25f, 10),
+                    Entry(ObstacleDirection.Left, 2, 4.3f, 0.25f, 11),
+                    Entry(ObstacleDirection.Down, 1, 4.3f, 0.25f, 12),
+                },
+            },
+            new WaveDef
+            {
+                Obstacles = new[]
+                {
+                    Entry(ObstacleDirection.Right, 0, 0.7f, 0.25f, 1),
+                    Entry(ObstacleDirection.Top, 2, 0.7f, 0.25f, 2),
+                    Entry(ObstacleDirection.Left, 1, 0.7f, 0.25f, 3),
+                    Entry(ObstacleDirection.Down, 0, 1.3f, 0.25f, 4),
+                    Entry(ObstacleDirection.Right, 2, 1.3f, 0.25f, 5),
+                    Entry(ObstacleDirection.Top, 0, 1.9f, 0.25f, 6),
+                    Entry(ObstacleDirection.Left, 2, 1.9f, 0.25f, 7),
+                    Entry(ObstacleDirection.Down, 1, 2.5f, 0.25f, 8),
+                    Entry(ObstacleDirection.Right, 1, 2.5f, 0.25f, 9),
+                    Entry(ObstacleDirection.Top, 1, 3.1f, 0.25f, 10),
+                    Entry(ObstacleDirection.Left, 0, 3.1f, 0.25f, 11),
+                    Entry(ObstacleDirection.Down, 2, 3.7f, 0.25f, 12),
+                    Entry(ObstacleDirection.Right, 0, 3.7f, 0.25f, 13),
+                    Entry(ObstacleDirection.Top, 2, 4.3f, 0.25f, 14),
+                    Entry(ObstacleDirection.Left, 1, 4.3f, 0.25f, 15),
                 },
             },
         };
@@ -735,6 +897,59 @@ public partial class GridSampleManager : Node2D
         };
     }
 
+    private void LoadHighScore()
+    {
+        _highScore = 0;
+        _highWave = 0;
+
+        if (!Godot.FileAccess.FileExists(HighScorePath))
+            return;
+
+        Godot.FileAccess? file = Godot.FileAccess.Open(HighScorePath, Godot.FileAccess.ModeFlags.Read);
+        if (file == null)
+            return;
+
+        string json = file.GetAsText();
+        file.Close();
+
+        if (string.IsNullOrWhiteSpace(json))
+            return;
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            JsonElement root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return;
+
+            if (root.TryGetProperty("score", out JsonElement scoreElement) && scoreElement.TryGetInt32(out int score))
+                _highScore = Mathf.Max(0, score);
+
+            if (root.TryGetProperty("wave", out JsonElement waveElement) && waveElement.TryGetInt32(out int wave))
+                _highWave = Mathf.Max(0, wave);
+        }
+        catch (JsonException)
+        {
+            GD.PushWarning("highscore.json の解析に失敗しました。既定値を使用します。");
+            _highScore = 0;
+            _highWave = 0;
+        }
+    }
+
+    private void SaveHighScore()
+    {
+        string json = $"{{\"score\":{_highScore},\"wave\":{_highWave}}}";
+        Godot.FileAccess? file = Godot.FileAccess.Open(HighScorePath, Godot.FileAccess.ModeFlags.Write);
+        if (file == null)
+        {
+            GD.PushWarning("highscore.json を書き込めませんでした。");
+            return;
+        }
+
+        file.StoreString(json);
+        file.Close();
+    }
+
     // ──────────── 状態リセット ────────────
     private void ResetToIdleState(bool showIntroMessage)
     {
@@ -752,7 +967,8 @@ public partial class GridSampleManager : Node2D
 
         _isMoving = false;
         _isGuarding = false;
-        _guardReleasing = false;
+        _activeTween?.Kill();
+        _activeTween = null;
         _spaceHolding = false;
         _touchHolding = false;
         _touchEligible = false;
@@ -784,10 +1000,14 @@ public partial class GridSampleManager : Node2D
         _activeEvent = null;
         _pendingWaveIndex = -1;
         _eventLocked = false;
+        _eventTimer = 0f;
+        if (_eventTimerLabel != null)
+            _eventTimerLabel.Visible = false;
 
         ClearObstacleVisuals();
         ClearWarningVisuals();
         ClearTransientEffects();
+        ClearDeathSummary();
 
         HideGuardEffect();
         HideZoneEffect();
@@ -947,8 +1167,17 @@ public partial class GridSampleManager : Node2D
     private bool TryMove(int dx, int dy)
     {
         // Playing と WaitingChoice 両方で移動可能
-        if ((_state != GameState.Playing && _state != GameState.WaitingChoice) || _isMoving || _isGuarding || _guardReleasing)
+        if ((_state != GameState.Playing && _state != GameState.WaitingChoice) || _isGuarding)
             return false;
+
+        if (_isMoving)
+        {
+            // 連続入力時は現在Tweenを破棄し、旧移動を即時確定してから新規移動を開始する
+            _activeTween?.Kill();
+            _activeTween = null;
+            _isMoving = false;
+            _player.Position = _cellCenters[_playerCol, _playerRow];
+        }
 
         int targetCol = _playerCol + dx;
         int targetRow = _playerRow + dy;
@@ -968,14 +1197,14 @@ public partial class GridSampleManager : Node2D
         _isMoving = true;
 
         // moveアニメーション開始
-        _player.Play("move");
+        _player.Play(dx == -1 ? "move_back" : "move_forward");
 
         // ヌルっとした移動: Cubic.InOut で加速→減速
-        Tween tween = CreateTween();
-        tween.TweenProperty(_player, "position", _cellCenters[_playerCol, _playerRow], MoveDuration)
+        _activeTween = CreateTween();
+        _activeTween.TweenProperty(_player, "position", _cellCenters[_playerCol, _playerRow], MoveDuration)
             .SetEase(Tween.EaseType.InOut)
             .SetTrans(Tween.TransitionType.Cubic);
-        tween.TweenCallback(Callable.From(() => OnMoveFinished(fromCol, fromRow, stayBeforeMove)));
+        _activeTween.TweenCallback(Callable.From(() => OnMoveFinished(fromCol, fromRow, stayBeforeMove)));
 
         UpdateCellColors();
         return true;
@@ -984,6 +1213,7 @@ public partial class GridSampleManager : Node2D
     private void OnMoveFinished(int fromCol, int fromRow, float stayBeforeMove)
     {
         _isMoving = false;
+        _activeTween = null;
 
         _lastLeftCol = fromCol;
         _lastLeftRow = fromRow;
@@ -993,7 +1223,7 @@ public partial class GridSampleManager : Node2D
 
         // moveアニメーションが終わるまで待つ（AnimationFinishedで復帰）
         // ただしmoveが既に終わっていればrunに戻す
-        if (_player.Animation != "move")
+        if (_player.Animation != "move_forward" && _player.Animation != "move_back")
         {
             if (_state == GameState.Playing || _state == GameState.WaitingChoice)
                 _player.Play(_isGuarding ? "guard" : "run");
@@ -1053,7 +1283,6 @@ public partial class GridSampleManager : Node2D
             return;
 
         _isGuarding = true;
-        _guardReleasing = false;
         _player.Play("guard");
         ShowGuardEffect();
     }
@@ -1065,10 +1294,15 @@ public partial class GridSampleManager : Node2D
         _isGuarding = false;
         HideGuardEffect();
 
-        // ガード解除: フレーム6-8を再生
-        _guardReleasing = true;
-        _player.Play("guard_release");
-        // guard_release の AnimationFinished で _guardReleasing = false & run に戻る
+        // Pause中のguardを再開して残りフレーム(6-8)を再生
+        if (_player.Animation == "guard")
+        {
+            _player.Play();
+            return;
+        }
+
+        if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+            _player.Play("run");
     }
 
     // ──────────── 障害物Tick ────────────
@@ -1136,8 +1370,8 @@ public partial class GridSampleManager : Node2D
         order.Position = GetWarningNumberPosition(state.Entry.Direction, entryCenter);
         order.AddThemeFontSizeOverride("font_size", 52);
         order.AddThemeColorOverride("font_color", Colors.White);
-        order.AddThemeColorOverride("font_outline_color", new Color(0.8f, 0.1f, 0.1f, 1f));
-        order.AddThemeConstantOverride("outline_size", 6);
+        order.AddThemeColorOverride("font_outline_color", new Color(1f, 0.2f, 0.2f, 1f));
+        order.AddThemeConstantOverride("outline_size", 4);
 
         _warningRoot.AddChild(arrow);
         _warningRoot.AddChild(order);
@@ -1218,7 +1452,7 @@ public partial class GridSampleManager : Node2D
         if (state.Entry.Direction == ObstacleDirection.Left)
             obstacleVisual.FlipH = true;
 
-        Vector2 start = GetOutsidePoint(state.Entry.Direction, state.Entry.Lane, entering: true);
+        Vector2 start = ComputeObstaclePosition(state.Entry, 0f);
         obstacleVisual.Position = start - new Vector2(55f, 55f);
 
         _obstaclesRoot.AddChild(obstacleVisual);
@@ -1231,9 +1465,12 @@ public partial class GridSampleManager : Node2D
         state.ElapsedSinceSpawn += dt;
 
         float t = state.ElapsedSinceSpawn / Mathf.Max(0.0001f, state.Entry.SpeedPerCell);
-        int rawIndex = Mathf.FloorToInt(t);
 
-        int maxCellToResolve = Mathf.Min(rawIndex, 2);
+        // セル中心（index+0.5）を通過した瞬間に1回だけ判定する。
+        int maxCellToResolve = Mathf.FloorToInt(t - 0.5f);
+        if (maxCellToResolve > 2)
+            maxCellToResolve = 2;
+
         if (maxCellToResolve > state.CurrentCellIndex)
         {
             for (int cellIndex = state.CurrentCellIndex + 1; cellIndex <= maxCellToResolve; cellIndex++)
@@ -1247,8 +1484,8 @@ public partial class GridSampleManager : Node2D
             state.Visual.Position = position - new Vector2(55f, 55f);
         }
 
-        // 3セル通過+退出 → t>=4 で消滅
-        if (t >= 4f)
+        // 退出完了は t>=3.5
+        if (t >= 3.5f)
             FinishObstacle(ref state);
     }
 
@@ -1443,7 +1680,13 @@ public partial class GridSampleManager : Node2D
             return;
         }
 
-        ShowInterWaveEvent(_currentWaveIndex + 1);
+        int nextWave = _currentWaveIndex + 1;
+        SceneTreeTimer timer = GetTree().CreateTimer(1f);
+        timer.Timeout += () =>
+        {
+            if (_state == GameState.Playing && _waveResolved)
+                ShowInterWaveEvent(nextWave);
+        };
     }
 
     private void ShowInterWaveEvent(int nextWaveIndex)
@@ -1460,6 +1703,9 @@ public partial class GridSampleManager : Node2D
         _choiceA.Disabled = false;
         _choiceB.Disabled = false;
 
+        _eventTimer = EventTimeLimit;
+        UpdateEventTimerLabel();
+
         _eventPanel.Visible = true;
         _eventPanel.Modulate = new Color(1f, 1f, 1f, 0f);
         _eventPanel.MouseFilter = Control.MouseFilterEnum.Stop; // パネル自体は入力を受ける
@@ -1470,6 +1716,31 @@ public partial class GridSampleManager : Node2D
         _stateLabel.Text = "イベントを選択して次へ";
     }
 
+    private void TickEventTimer(float dt)
+    {
+        if (_state != GameState.WaitingChoice || _activeEvent == null || _eventLocked)
+            return;
+
+        _eventTimer = Mathf.Max(0f, _eventTimer - dt);
+        UpdateEventTimerLabel();
+
+        if (_eventTimer <= 0f)
+            OnEventOptionSelected(chooseA: _rng.Randf() > 0.5f);
+    }
+
+    private void UpdateEventTimerLabel()
+    {
+        if (_eventTimerLabel == null)
+            return;
+
+        bool visible = _state == GameState.WaitingChoice && _activeEvent != null && !_eventLocked;
+        _eventTimerLabel.Visible = visible;
+        if (!visible)
+            return;
+
+        _eventTimerLabel.Text = $"残り {Mathf.CeilToInt(_eventTimer)} 秒";
+    }
+
     private void OnEventOptionSelected(bool chooseA)
     {
         if (_state != GameState.WaitingChoice || _eventLocked || _activeEvent == null)
@@ -1478,6 +1749,7 @@ public partial class GridSampleManager : Node2D
         _eventLocked = true;
         _choiceA.Disabled = true;
         _choiceB.Disabled = true;
+        UpdateEventTimerLabel();
 
         if (chooseA)
             ApplyEventOutcome(_activeEvent.LifeGainA, _activeEvent.ComboGainA, _activeEvent.ResponseA);
@@ -1491,6 +1763,8 @@ public partial class GridSampleManager : Node2D
             _eventPanel.Modulate = Colors.White;
             _eventLocked = false;
             _activeEvent = null;
+            _eventTimer = 0f;
+            UpdateEventTimerLabel();
 
             if (_state == GameState.Dead) { _pendingWaveIndex = -1; return; }
 
@@ -1511,7 +1785,15 @@ public partial class GridSampleManager : Node2D
 
     private void HideEventPanel()
     {
-        if (!_eventPanel.Visible) return;
+        if (!_eventPanel.Visible)
+        {
+            _activeEvent = null;
+            _eventTimer = 0f;
+            _eventLocked = false;
+            UpdateEventTimerLabel();
+            return;
+        }
+
         Tween fadeOut = CreateTween();
         fadeOut.TweenProperty(_eventPanel, "modulate:a", 0f, 0.2f);
         fadeOut.TweenCallback(Callable.From(() =>
@@ -1519,6 +1801,9 @@ public partial class GridSampleManager : Node2D
             _eventPanel.Visible = false;
             _eventPanel.Modulate = Colors.White;
             _activeEvent = null;
+            _eventTimer = 0f;
+            _eventLocked = false;
+            UpdateEventTimerLabel();
         }));
     }
 
@@ -1532,7 +1817,7 @@ public partial class GridSampleManager : Node2D
         HideEventPanel();
         HideGuardEffect();
         if (_zoneActive) DeactivateZone();
-        _stateLabel.Text = "ALL WAVES CLEAR!";
+        _stateLabel.Text = "全Wave突破！";
         _stateLabel.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f, 1f));
         Speak("やった！全Wave突破！", 3f);
     }
@@ -1544,11 +1829,79 @@ public partial class GridSampleManager : Node2D
         HideGuardEffect();
         if (_zoneActive) DeactivateZone();
         _player.Play("death");
-        _stateLabel.Text = "DEAD - Tap to restart";
+        _stateLabel.Text = "DEAD - タップでリトライ";
         _stateLabel.AddThemeColorOverride("font_color", Colors.White);
+
+        UpdateHighScoreIfNeeded();
+        ShowDeathSummary();
+
         Tween deathTween = CreateTween();
         deathTween.TweenProperty(_deathOverlay, "color:a", 0.6f, 2f);
         Speak("お疲れ様...また次の人生で。", 3f);
+    }
+
+    private void UpdateHighScoreIfNeeded()
+    {
+        int reachedWave = _currentWaveIndex + 1;
+        bool updated = false;
+
+        if (_totalScore > _highScore)
+        {
+            _highScore = _totalScore;
+            updated = true;
+        }
+
+        if (reachedWave > _highWave)
+        {
+            _highWave = reachedWave;
+            updated = true;
+        }
+
+        if (updated)
+            SaveHighScore();
+    }
+
+    private void ShowDeathSummary()
+    {
+        if (_deathSummaryLabels.Count == 0)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                Label label = new();
+                label.AnchorLeft = 0f;
+                label.AnchorRight = 1f;
+                label.AnchorTop = 0f;
+                label.AnchorBottom = 0f;
+                label.OffsetLeft = 120f;
+                label.OffsetRight = -120f;
+                label.OffsetTop = 760f + (i * 66f);
+                label.OffsetBottom = label.OffsetTop + 56f;
+                label.HorizontalAlignment = HorizontalAlignment.Center;
+                label.VerticalAlignment = VerticalAlignment.Center;
+                label.AddThemeFontSizeOverride("font_size", 40);
+                label.AddThemeColorOverride("font_color", Colors.White);
+                label.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.75f));
+                label.AddThemeConstantOverride("outline_size", 4);
+                _deathOverlay.AddChild(label);
+                _deathSummaryLabels.Add(label);
+            }
+        }
+
+        _deathSummaryLabels[0].Text = $"スコア: {_totalScore}";
+        _deathSummaryLabels[1].Text = $"ハイスコア: {_highScore}";
+        _deathSummaryLabels[2].Text = $"到達Wave: {_currentWaveIndex + 1}/{_waves.Length}";
+
+        for (int i = 0; i < _deathSummaryLabels.Count; i++)
+            _deathSummaryLabels[i].Visible = true;
+    }
+
+    private void ClearDeathSummary()
+    {
+        for (int i = 0; i < _deathSummaryLabels.Count; i++)
+        {
+            _deathSummaryLabels[i].Visible = false;
+            _deathSummaryLabels[i].Text = string.Empty;
+        }
     }
 
     // ──────────── アニメーション完了ハンドラ ────────────
@@ -1562,17 +1915,8 @@ public partial class GridSampleManager : Node2D
             return;
         }
 
-        // ガード解除アニメーション完了
-        if (_player.Animation == "guard_release")
-        {
-            _guardReleasing = false;
-            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
-                _player.Play("run");
-            return;
-        }
-
         // moveアニメーション完了 → runに復帰
-        if (_player.Animation == "move")
+        if (_player.Animation == "move_forward" || _player.Animation == "move_back")
         {
             if (_state == GameState.Playing || _state == GameState.WaitingChoice)
                 _player.Play(_isGuarding ? "guard" : "run");
@@ -1584,6 +1928,13 @@ public partial class GridSampleManager : Node2D
         {
             if (_state == GameState.Playing || _state == GameState.WaitingChoice)
                 _player.Play(_isGuarding ? "guard" : "run");
+            return;
+        }
+
+        if (_player.Animation == "guard")
+        {
+            if (_state == GameState.Playing || _state == GameState.WaitingChoice)
+                _player.Play("run");
         }
     }
 
@@ -1907,8 +2258,8 @@ public partial class GridSampleManager : Node2D
         _phaseLabel.Text = "青年期";
         _ageLabel.Text = "20歳";
         _waveLabel.Text = $"Wave {Mathf.Clamp(_currentWaveIndex + 1, 1, _waves.Length)}/{_waves.Length}";
-        _comboLabel.Text = _zoneActive ? $"ZONE! Combo: {_combo}" : $"Combo: {_combo}";
-        _scoreLabel.Text = $"Score: {_totalScore}";
+        _comboLabel.Text = $"コンボ: {_combo}";
+        _scoreLabel.Text = $"スコア: {_totalScore}";
 
         _lifeBar.MaxValue = BaseLife;
         _lifeBar.Value = _life;
@@ -1916,12 +2267,12 @@ public partial class GridSampleManager : Node2D
 
         if (_state == GameState.Dead)
         {
-            _stateLabel.Text = "DEAD - Tap to restart";
+            _stateLabel.Text = "DEAD - タップでリトライ";
             return;
         }
         if (_state == GameState.Cleared)
         {
-            _stateLabel.Text = "ALL WAVES CLEAR!";
+            _stateLabel.Text = "全Wave突破！";
             _stateLabel.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f, 1f));
             return;
         }
@@ -1930,7 +2281,7 @@ public partial class GridSampleManager : Node2D
 
         if (_state == GameState.Idle)
         {
-            _stateLabel.Text = _allWavesCleared ? "ALL WAVES CLEAR!" : "Tap to start";
+            _stateLabel.Text = "タップでスタート";
             return;
         }
         if (_state == GameState.WaitingChoice)
@@ -1939,7 +2290,7 @@ public partial class GridSampleManager : Node2D
             return;
         }
 
-        _stateLabel.Text = _isGuarding ? "Guarding" : "";
+        _stateLabel.Text = "";
     }
 
     private void UpdateLifeFillColor()
@@ -2032,26 +2383,22 @@ public partial class GridSampleManager : Node2D
 
     /// <summary>
     /// 障害物の位置を計算（反射バグ修正版）。
-    /// t=0..1: 画面外→セル0、t=1..2: セル0→セル1、t=2..3: セル1→セル2、t=3..4: セル2→画面外
-    /// t>=4 で退出完了。
+    /// t=0..2: セル0→セル2 を線形補間。
+    /// t=2..3.5: セル2→画面外 を線形補間。
+    /// t>=3.5 で退出完了。
     /// </summary>
     private Vector2 ComputeObstaclePosition(ObstacleEntry entry, float t)
     {
-        Vector2 outsideStart = GetOutsidePoint(entry.Direction, entry.Lane, entering: true);
         Vector2 outsideEnd = GetOutsidePoint(entry.Direction, entry.Lane, entering: false);
 
         Vector2I c0i = GetPathCell(entry.Direction, entry.Lane, 0);
-        Vector2I c1i = GetPathCell(entry.Direction, entry.Lane, 1);
         Vector2I c2i = GetPathCell(entry.Direction, entry.Lane, 2);
         Vector2 c0 = _cellCenters[c0i.X, c0i.Y];
-        Vector2 c1 = _cellCenters[c1i.X, c1i.Y];
         Vector2 c2 = _cellCenters[c2i.X, c2i.Y];
 
-        if (t <= 0f) return outsideStart;
-        if (t < 1f) return outsideStart.Lerp(c0, t);
-        if (t < 2f) return c0.Lerp(c1, t - 1f);
-        if (t < 3f) return c1.Lerp(c2, t - 2f);
-        if (t < 4f) return c2.Lerp(outsideEnd, t - 3f);
+        if (t <= 0f) return c0;
+        if (t < 2f) return c0.Lerp(c2, t * 0.5f);
+        if (t < 3.5f) return c2.Lerp(outsideEnd, (t - 2f) / 1.5f);
         return outsideEnd;
     }
 
@@ -2107,7 +2454,7 @@ public partial class GridSampleManager : Node2D
                 Vector2I pathCell = GetPathCell(state.Entry.Direction, state.Entry.Lane, cellIndex);
                 if (pathCell.X != col || pathCell.Y != row) continue;
 
-                float reachTime = state.Entry.SpawnTime + (cellIndex * speed);
+                float reachTime = state.Entry.SpawnTime + ((cellIndex + 0.5f) * speed);
                 if (reachTime >= _waveElapsed && reachTime <= windowEnd) return true;
             }
         }
